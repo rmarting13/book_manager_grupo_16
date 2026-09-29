@@ -1,3 +1,6 @@
+## [Ejercicio 05]
+- Implementación lógica de importación y precarga de datos en preload_data.py + pruebas unitarias. 
+
 ## [Ejercicio 04]
 - Implementación de las clases de servicios sobre operaciones cada entidad en services.py.
 - Ajuste de modelos en entities.py para integración con las clases de servicios.
