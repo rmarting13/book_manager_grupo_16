@@ -1,9 +1,9 @@
 import abc
 import csv
+import os
 from datetime import date, datetime
 from decimal import Decimal
-from pathlib import Path
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+from typing import Dict, Generic, List, Optional, Type, TypeVar, Union
 
 from book_manager.entities.entities import (
     CotizacionDolar,
@@ -21,22 +21,22 @@ from book_manager.entities.entities import (
 T = TypeVar('T', bound=EntidadBase)
 
 
-def _asegurar_csv(ruta: Path, columnas: List[str]) -> None:
+def _asegurar_csv(ruta: str, columnas: List[str]) -> None:
     """Crea el directorio y el CSV con encabezado si todavía no existe."""
-    ruta.parent.mkdir(parents=True, exist_ok=True)
-    if not ruta.exists():
+    os.makedirs(os.path.dirname(ruta) or ".", exist_ok=True)
+    if not os.path.exists(ruta):
         _escribir_csv(ruta, columnas, [])
 
 
-def _leer_csv(ruta: Path) -> List[Dict[str, str]]:
+def _leer_csv(ruta: str) -> List[Dict[str, str]]:
     """Lee un CSV y devuelve sus filas como diccionarios."""
-    with ruta.open("r", encoding="utf-8", newline="") as archivo:
+    with open(ruta, "r", encoding="utf-8", newline="") as archivo:
         return list(csv.DictReader(archivo))
 
 
-def _escribir_csv(ruta: Path, columnas: List[str], filas: List[Dict[str, str]]) -> None:
+def _escribir_csv(ruta: str, columnas: List[str], filas: List[Dict[str, str]]) -> None:
     """Reemplaza el contenido de un CSV con las filas indicadas."""
-    with ruta.open("w", encoding="utf-8", newline="") as archivo:
+    with open(ruta, "w", encoding="utf-8", newline="") as archivo:
         escritor = csv.DictWriter(archivo, fieldnames=columnas)
         escritor.writeheader()
         escritor.writerows(filas)
@@ -240,17 +240,17 @@ class IRepositorioCotizacionDolar(abc.ABC):
 class RepositorioCSV(IRepositorio[T], Generic[T]):
     """Repositorio base para entidades persistidas en formato CSV."""
 
-    def __init__(self, ruta_archivo: Path, entidad_cls: Type[T]) -> None:
+    def __init__(self, ruta_archivo: str, entidad_cls: Type[T]) -> None:
         """Inicializa el repositorio con su ruta y clase de entidad."""
-        self.ruta_archivo = Path(ruta_archivo)
+        self.ruta_archivo = ruta_archivo
         self.entidad_cls = entidad_cls
         self._asegurar_archivo()
 
     def _asegurar_archivo(self) -> None:
         """Crea el directorio y el CSV con encabezado si todavía no existe."""
-        self.ruta_archivo.parent.mkdir(parents=True, exist_ok=True)
-        if not self.ruta_archivo.exists():
-            with self.ruta_archivo.open("w", encoding="utf-8", newline="") as archivo:
+        os.makedirs(os.path.dirname(self.ruta_archivo) or ".", exist_ok=True)
+        if not os.path.exists(self.ruta_archivo):
+            with open(self.ruta_archivo, "w", encoding="utf-8", newline="") as archivo:
                 escritor = csv.DictWriter(archivo, fieldnames=self._columnas())
                 escritor.writeheader()
 
@@ -268,13 +268,13 @@ class RepositorioCSV(IRepositorio[T], Generic[T]):
 
     def _leer_filas(self) -> List[Dict[str, str]]:
         """Lee todas las filas del CSV y devuelve una lista de diccionarios."""
-        with self.ruta_archivo.open("r", encoding="utf-8", newline="") as archivo:
+        with open(self.ruta_archivo, "r", encoding="utf-8", newline="") as archivo:
             lector = csv.DictReader(archivo)
             return list(lector)
 
     def _escribir_filas(self, filas: List[Dict[str, str]]) -> None:
         """Reemplaza el contenido del CSV con las filas indicadas."""
-        with self.ruta_archivo.open("w", encoding="utf-8", newline="") as archivo:
+        with open(self.ruta_archivo, "w", encoding="utf-8", newline="") as archivo:
             escritor = csv.DictWriter(archivo, fieldnames=self._columnas())
             escritor.writeheader()
             escritor.writerows(filas)
@@ -335,7 +335,7 @@ class RepositorioCSV(IRepositorio[T], Generic[T]):
 class RepositorioMoneda(RepositorioCSV[Moneda]):
     """Repositorio CSV de monedas."""
 
-    def __init__(self, ruta_archivo: Path) -> None:
+    def __init__(self, ruta_archivo: str) -> None:
         """Inicializa el repositorio de monedas."""
         super().__init__(ruta_archivo, Moneda)
 
@@ -365,7 +365,7 @@ class RepositorioMoneda(RepositorioCSV[Moneda]):
 class RepositorioGenero(RepositorioCSV[Genero]):
     """Repositorio CSV de géneros literarios."""
 
-    def __init__(self, ruta_archivo: Path) -> None:
+    def __init__(self, ruta_archivo: str) -> None:
         """Inicializa el repositorio de géneros."""
         super().__init__(ruta_archivo, Genero)
 
@@ -395,7 +395,7 @@ class RepositorioGenero(RepositorioCSV[Genero]):
 class RepositorioEditorial(RepositorioCSV[Editorial]):
     """Repositorio CSV de editoriales."""
 
-    def __init__(self, ruta_archivo: Path) -> None:
+    def __init__(self, ruta_archivo: str) -> None:
         """Inicializa el repositorio de editoriales."""
         super().__init__(ruta_archivo, Editorial)
 
@@ -429,7 +429,7 @@ class RepositorioEditorial(RepositorioCSV[Editorial]):
 class RepositorioLibro(RepositorioCSV[Libro]):
     """Repositorio CSV de libros con relaciones a editorial y género."""
 
-    def __init__(self, ruta_archivo: Path, repo_editorial: RepositorioEditorial, repo_genero: RepositorioGenero) -> None:
+    def __init__(self, ruta_archivo: str, repo_editorial: RepositorioEditorial, repo_genero: RepositorioGenero) -> None:
         """Inicializa el repositorio con sus dependencias relacionadas."""
         self.repo_editorial = repo_editorial
         self.repo_genero = repo_genero
@@ -486,7 +486,7 @@ class RepositorioLibro(RepositorioCSV[Libro]):
 class RepositorioPrecio(RepositorioCSV[Precio]):
     """Repositorio CSV de precios con relaciones a libro y moneda."""
 
-    def __init__(self, ruta_archivo: Path, repo_libro: RepositorioLibro, repo_moneda: RepositorioMoneda) -> None:
+    def __init__(self, ruta_archivo: str, repo_libro: RepositorioLibro, repo_moneda: RepositorioMoneda) -> None:
         """Inicializa el repositorio de precios con sus dependencias."""
         self.repo_libro = repo_libro
         self.repo_moneda = repo_moneda
@@ -524,9 +524,9 @@ class RepositorioPrecio(RepositorioCSV[Precio]):
 class RepositorioStock(IRepositorioStock):
     """Repositorio CSV de stock con unicidad por libro."""
 
-    def __init__(self, ruta_archivo: Path, repo_libro: RepositorioLibro) -> None:
+    def __init__(self, ruta_archivo: str, repo_libro: RepositorioLibro) -> None:
         """Inicializa el repositorio de stock con acceso a libros."""
-        self.ruta_archivo = Path(ruta_archivo)
+        self.ruta_archivo = ruta_archivo
         self.repo_libro = repo_libro
         _asegurar_csv(self.ruta_archivo, self._columnas())
 
@@ -608,9 +608,9 @@ class RepositorioStock(IRepositorioStock):
 class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
     """Repositorio CSV de cotizaciones del dólar por tipo y fecha."""
 
-    def __init__(self, ruta_archivo: Path, repo_moneda: RepositorioMoneda) -> None:
+    def __init__(self, ruta_archivo: str, repo_moneda: RepositorioMoneda) -> None:
         """Inicializa el repositorio de cotizaciones con acceso a monedas."""
-        self.ruta_archivo = Path(ruta_archivo)
+        self.ruta_archivo = ruta_archivo
         self.repo_moneda = repo_moneda
         _asegurar_csv(self.ruta_archivo, self._columnas())
 

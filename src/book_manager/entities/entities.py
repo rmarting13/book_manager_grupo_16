@@ -14,6 +14,16 @@ _URL_ADAPTER = TypeAdapter(HttpUrl)
 UrlWeb = Annotated[str, AfterValidator(lambda v: str(_URL_ADAPTER.validate_python(v)))]
 """URL web recibida como str y validada como HttpUrl (se guarda normalizada como str)."""
 
+class ArchivoCsv(str, Enum):
+    "Nopmbres de archivos CSV correspondientes a cada entidad"
+    MONEDA = "monedas.csv"
+    GENERO = "generos.csv"
+    EDITORIAL = "editoriales.csv"
+    LIBRO = "libros.csv"
+    PRECIO = "precios.csv"
+    STOCK = "stock.csv"
+    COTIZACION = "cotizaciones.csv"
+
 
 class GeneroLiterario(str, Enum):
     """
