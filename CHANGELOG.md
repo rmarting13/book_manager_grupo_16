@@ -1,3 +1,6 @@
+## [Ejercicio 06]
+- Implementación lógica para interfaz de usuario en console.py.
+
 ## [Ejercicio 05]
 - Implementación lógica de importación y precarga de datos en preload_data.py + pruebas unitarias. 
 
