@@ -236,6 +236,10 @@ class IRepositorioCotizacionDolar(abc.ABC):
     """
     pass
 
+class RepositorioError(ValueError):
+        """
+            Clase de error a nivel de persistencia de datos.
+        """
 
 class RepositorioCSV(IRepositorio[T], Generic[T]):
     """Repositorio base para entidades persistidas en formato CSV."""
@@ -291,7 +295,7 @@ class RepositorioCSV(IRepositorio[T], Generic[T]):
         if entidad.id == 0:
             entidad = entidad.model_copy(update={"id": self._siguiente_id()})
         elif entidad.id in ids_existentes:
-            raise ValueError(f"Ya existe un registro con id {entidad.id}.")
+            raise RepositorioError(f"Ya existe un registro con id {entidad.id}.")
 
         filas.append(self._a_fila(entidad))
         self._escribir_filas(filas)
@@ -318,7 +322,7 @@ class RepositorioCSV(IRepositorio[T], Generic[T]):
                 encontrada = True
                 break
         if not encontrada:
-            raise ValueError(f"No existe un registro con id {entidad.id} para actualizar.")
+            raise RepositorioError(f"No existe un registro con id {entidad.id} para actualizar.")
         self._escribir_filas(filas)
         return entidad
 
@@ -469,7 +473,7 @@ class RepositorioLibro(RepositorioCSV[Libro]):
         editorial = self.repo_editorial.leer_por_id(int(fila["editorial_id"]))
         genero = self.repo_genero.leer_por_id(int(fila["genero_id"]))
         if not editorial or not genero:
-            raise ValueError("No se pudo reconstruir el libro por referencias inexistentes.")
+            raise RepositorioError("No se pudo reconstruir el libro por referencias inexistentes.")
         return Libro(
             id=int(fila["id"]),
             isbn=fila["isbn"],
@@ -511,7 +515,7 @@ class RepositorioPrecio(RepositorioCSV[Precio]):
         libro = self.repo_libro.leer_por_id(int(fila["libro_id"]))
         moneda = self.repo_moneda.leer_por_id(int(fila["moneda_id"]))
         if not libro or not moneda:
-            raise ValueError("No se pudo reconstruir el precio por referencias inexistentes.")
+            raise RepositorioError("No se pudo reconstruir el precio por referencias inexistentes.")
         return Precio(
             id=int(fila["id"]),
             libro=libro,
@@ -548,7 +552,7 @@ class RepositorioStock(IRepositorioStock):
         """Reconstruye un registro de stock desde CSV."""
         libro = self.repo_libro.leer_por_id(int(fila["libro_id"]))
         if not libro:
-            raise ValueError("No se pudo reconstruir el stock por libro inexistente.")
+            raise RepositorioError("No se pudo reconstruir el stock por libro inexistente.")
         return Stock(
             id=int(fila["id"]),
             libro=libro,
@@ -560,13 +564,13 @@ class RepositorioStock(IRepositorioStock):
     def crear(self, stock: Stock) -> Stock:
         """Crea stock validando que no exista otro para el mismo libro."""
         if self.leer_por_libro(stock.libro.id):
-            raise ValueError(f"Ya existe stock para el libro con id {stock.libro.id}.")
+            raise RepositorioError(f"Ya existe stock para el libro con id {stock.libro.id}.")
         filas = _leer_csv(self.ruta_archivo)
         ids_existentes = {int(fila["id"]) for fila in filas if fila.get("id")}
         if stock.id == 0:
             stock = stock.model_copy(update={"id": max(ids_existentes, default=0) + 1})
         elif stock.id in ids_existentes:
-            raise ValueError(f"Ya existe un registro de stock con id {stock.id}.")
+            raise RepositorioError(f"Ya existe un registro de stock con id {stock.id}.")
         filas.append(self._a_fila(stock))
         _escribir_csv(self.ruta_archivo, self._columnas(), filas)
         return stock
@@ -586,14 +590,14 @@ class RepositorioStock(IRepositorioStock):
         """Actualiza un registro de stock existente."""
         existente = self.leer_por_libro(stock.libro.id)
         if existente and existente.id != stock.id:
-            raise ValueError(f"Ya existe otro registro de stock para el libro con id {stock.libro.id}.")
+            raise RepositorioError(f"Ya existe otro registro de stock para el libro con id {stock.libro.id}.")
         filas = _leer_csv(self.ruta_archivo)
         for indice, fila in enumerate(filas):
             if int(fila["id"]) == stock.id:
                 filas[indice] = self._a_fila(stock)
                 _escribir_csv(self.ruta_archivo, self._columnas(), filas)
                 return stock
-        raise ValueError(f"No existe un registro de stock con id {stock.id} para actualizar.")
+        raise RepositorioError(f"No existe un registro de stock con id {stock.id} para actualizar.")
 
     def eliminar(self, libro_id: int) -> bool:
         """Elimina el stock de un libro por su ID de libro."""
@@ -643,7 +647,7 @@ class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
         moneda_origen = self.repo_moneda.leer_por_id(int(fila["moneda_origen_id"]))
         moneda_destino = self.repo_moneda.leer_por_id(int(fila["moneda_destino_id"]))
         if not moneda_origen or not moneda_destino:
-            raise ValueError("No se pudo reconstruir la cotización por monedas inexistentes.")
+            raise RepositorioError("No se pudo reconstruir la cotización por monedas inexistentes.")
         return CotizacionDolar(
             id=int(fila["id"]),
             tipo=TipoCotizacion(fila["tipo"]),
@@ -657,13 +661,13 @@ class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
     def crear(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
         """Crea una cotización validando unicidad por tipo y fecha."""
         if self.leer_por_tipo_y_fecha(cotizacion.tipo, cotizacion.fecha.date()):
-            raise ValueError("Ya existe una cotización para ese tipo y fecha.")
+            raise RepositorioError("Ya existe una cotización para ese tipo y fecha.")
         filas = _leer_csv(self.ruta_archivo)
         ids_existentes = {int(fila["id"]) for fila in filas if fila.get("id")}
         if cotizacion.id == 0:
             cotizacion = cotizacion.model_copy(update={"id": max(ids_existentes, default=0) + 1})
         elif cotizacion.id in ids_existentes:
-            raise ValueError(f"Ya existe una cotización con id {cotizacion.id}.")
+            raise RepositorioError(f"Ya existe una cotización con id {cotizacion.id}.")
         filas.append(self._a_fila(cotizacion))
         _escribir_csv(self.ruta_archivo, self._columnas(), filas)
         return cotizacion
@@ -693,14 +697,14 @@ class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
         """Actualiza una cotización existente por ID."""
         existente = self.leer_por_tipo_y_fecha(cotizacion.tipo, cotizacion.fecha.date())
         if existente and existente.id != cotizacion.id:
-            raise ValueError("Ya existe otra cotización para ese tipo y fecha.")
+            raise RepositorioError("Ya existe otra cotización para ese tipo y fecha.")
         filas = _leer_csv(self.ruta_archivo)
         for indice, fila in enumerate(filas):
             if int(fila["id"]) == cotizacion.id:
                 filas[indice] = self._a_fila(cotizacion)
                 _escribir_csv(self.ruta_archivo, self._columnas(), filas)
                 return cotizacion
-        raise ValueError(f"No existe una cotización con id {cotizacion.id} para actualizar.")
+        raise RepositorioError(f"No existe una cotización con id {cotizacion.id} para actualizar.")
 
     def eliminar(self, tipo_id: Union[int, TipoCotizacion, str], fecha: date) -> bool:
         """Elimina una cotización por tipo y fecha."""
@@ -724,8 +728,8 @@ class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
             opciones = list(TipoCotizacion)
             if 0 <= tipo_id < len(opciones):
                 return opciones[tipo_id]
-            raise ValueError("Índice de tipo de cotización fuera de rango.")
+            raise RepositorioError("Índice de tipo de cotización fuera de rango.")
         for tipo in TipoCotizacion:
             if tipo.value.lower() == str(tipo_id).strip().lower() or tipo.name.lower() == str(tipo_id).strip().lower():
                 return tipo
-        raise ValueError(f"Tipo de cotización inválido: {tipo_id}.")
+        raise RepositorioError(f"Tipo de cotización inválido: {tipo_id}.")

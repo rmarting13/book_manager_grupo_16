@@ -6,6 +6,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Annotated, Dict, Optional, Any
 import re
+from book_manager.utilities.utilities import PrinterUtil
 
 
 
@@ -399,14 +400,9 @@ class CotizacionDolar(EntidadBase):
 # Pruebas unitarias:
 if __name__ == '__main__':
 
-    def dibujar_separador(text: str) -> None:
-        print(f"\n{'─' * 50}")
-        print(f"  {text}")
-        print(f"{'─' * 50}")
-
 
 # Monedas
-    dibujar_separador("1. Monedas")
+    PrinterUtil.dibujar_separador("1. Monedas")
 
     ars = Moneda(codigo="ARS", nombre="Peso Argentino", simbolo="$")
     usd = Moneda(codigo="USD", nombre="Dólar Estadounidense", simbolo="US$")
@@ -416,7 +412,7 @@ if __name__ == '__main__':
 
 
     # Géneros
-    dibujar_separador("2. Géneros")
+    PrinterUtil.dibujar_separador("2. Géneros")
 
     novela  = Genero(tipo=GeneroLiterario.NOVELA, descripcion="Narrativa extensa de ficción")
     manga   = Genero(tipo=GeneroLiterario.OTRO, nombre_personalizado="Manga / Cómic")
@@ -425,7 +421,7 @@ if __name__ == '__main__':
     print(manga)
 
     #Editoriales
-    dibujar_separador("3. Editoriales")
+    PrinterUtil.dibujar_separador("3. Editoriales")
 
     planeta   = Editorial(id=1, nombre="Planeta", pais_origen="Argentina",
                         email="info@planeta.com.ar", sitio_web='https://www.planeta.com.ar')
@@ -438,7 +434,7 @@ if __name__ == '__main__':
     print(conmemorativa)
 
     #Libros
-    dibujar_separador("4. Libros")
+    PrinterUtil.dibujar_separador("4. Libros")
 
     ficciones = Libro(
         isbn="9789504930419",
@@ -476,7 +472,7 @@ if __name__ == '__main__':
 
     # 
     #Precios
-    dibujar_separador("5. Precios")
+    PrinterUtil.dibujar_separador("5. Precios")
 
     precio_ficciones_ars = Precio(
         libro=ficciones,
@@ -496,7 +492,7 @@ if __name__ == '__main__':
 
 
     # Stock
-    dibujar_separador("6. Stock")
+    PrinterUtil.dibujar_separador("6. Stock")
 
     stock_ficciones = Stock(
         libro=ficciones,
@@ -518,7 +514,7 @@ if __name__ == '__main__':
 
 
     # Cotizaciones
-    dibujar_separador("7. Cotizaciones")
+    PrinterUtil.dibujar_separador("7. Cotizaciones")
 
     cotizacion_blue = CotizacionDolar(
         tipo=TipoCotizacion.BLUE,
@@ -544,7 +540,7 @@ if __name__ == '__main__':
 
 
     # Manejo de errores de validación
-    dibujar_separador("9. Validaciones")
+    PrinterUtil.dibujar_separador("9. Validaciones")
 
     from pydantic import ValidationError
     

@@ -1,3 +1,7 @@
+## [Ejercicio 07]
+- Implementación de lógica en archivo main.py para ejecutar el sistema de inventario.
+- Ajustes en modelos de entidades, repositorios y servicios.
+
 ## [Ejercicio 06]
 - Implementación lógica para interfaz de usuario en console.py.
 

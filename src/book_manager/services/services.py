@@ -25,6 +25,7 @@ from book_manager.repositories.repositories import (
 
 class ServicioError(ValueError):
     """Clase de error base para validaciones."""
+    pass
 
 
 class MonedaServicio:
