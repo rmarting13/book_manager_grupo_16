@@ -10,6 +10,7 @@ from book_manager.repositories.repositories import (
     RepositorioMoneda,
     RepositorioPrecio,
     RepositorioStock,
+    RepositorioTipoCotizacion,
 )
 from book_manager.services.services import (
     MonedaServicio,
@@ -19,10 +20,11 @@ from book_manager.services.services import (
     ServicioLibro,
     ServicioPrecio,
     ServicioStock,
+    ServicioTipoCotizacion,
 )
 from book_manager.ui.console import ConsolaInventario
 
-RUTA_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'migrations')
+RUTA_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'migrations/csv')
 
 
 def main(import_default_data: bool = False) -> None:
@@ -39,7 +41,8 @@ def main(import_default_data: bool = False) -> None:
     repo_libro = RepositorioLibro(ruta(ArchivoCsv.LIBRO), repo_editorial, repo_genero)
     repo_precio = RepositorioPrecio(ruta(ArchivoCsv.PRECIO), repo_libro, repo_moneda)
     repo_stock = RepositorioStock(ruta(ArchivoCsv.STOCK), repo_libro)
-    repo_cotizacion = RepositorioCotizacionDolar(ruta(ArchivoCsv.COTIZACION), repo_moneda)
+    repo_tipo_cotizacion = RepositorioTipoCotizacion(ruta(ArchivoCsv.TIPO_COTIZACION))
+    repo_cotizacion = RepositorioCotizacionDolar(ruta(ArchivoCsv.COTIZACION), repo_moneda, repo_tipo_cotizacion)
 
     consola = ConsolaInventario(    ServicioLibro(repo_libro, repo_editorial, repo_genero, repo_precio, repo_stock),
                                     ServicioGenero(repo_genero, repo_libro),
@@ -47,7 +50,8 @@ def main(import_default_data: bool = False) -> None:
                                     ServicioPrecio(repo_precio, repo_libro, repo_moneda),
                                     ServicioStock(repo_stock, repo_libro),
                                     MonedaServicio(repo_moneda, repo_precio, repo_cotizacion),
-                                    ServicioCotizacionDolar(repo_cotizacion, repo_moneda) )
+                                    ServicioCotizacionDolar(repo_cotizacion, repo_moneda, repo_tipo_cotizacion),
+                                    ServicioTipoCotizacion(repo_tipo_cotizacion, repo_cotizacion) )
                                 
     
     consola.ejecutar()

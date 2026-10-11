@@ -23,6 +23,7 @@ from book_manager.repositories.repositories import (
     RepositorioMoneda,
     RepositorioPrecio,
     RepositorioStock,
+    RepositorioTipoCotizacion,
 )
 
 def precargar_datos(ruta_csv: str) -> None:
@@ -43,7 +44,10 @@ def precargar_datos(ruta_csv: str) -> None:
     repo_libro = RepositorioLibro(os.path.join(ruta_csv, ArchivoCsv.LIBRO.value), repo_editorial, repo_genero)
     repo_precio = RepositorioPrecio(os.path.join(ruta_csv, ArchivoCsv.PRECIO.value), repo_libro, repo_moneda)
     repo_stock = RepositorioStock(os.path.join(ruta_csv, ArchivoCsv.STOCK.value), repo_libro)
-    repo_cotizacion = RepositorioCotizacionDolar(os.path.join(ruta_csv, ArchivoCsv.COTIZACION.value), repo_moneda)
+    repo_tipo_cotizacion = RepositorioTipoCotizacion(os.path.join(ruta_csv, ArchivoCsv.TIPO_COTIZACION.value))
+    repo_cotizacion = RepositorioCotizacionDolar(
+        os.path.join(ruta_csv, ArchivoCsv.COTIZACION.value), repo_moneda, repo_tipo_cotizacion
+    )
 
     monedas = [
         Moneda(codigo="ARS", nombre="Peso argentino", simbolo="$"),
@@ -145,20 +149,36 @@ def precargar_datos(ruta_csv: str) -> None:
             )
         )
 
+    tipos_cotizacion = [
+        TipoCotizacion(nombre="Oficial", descripcion="Cotización oficial publicada por el BCRA."),
+        TipoCotizacion(nombre="Blue", descripcion="Cotización del mercado informal (dólar paralelo)."),
+        TipoCotizacion(nombre="MEP", descripcion="Dólar bolsa / Mercado Electrónico de Pagos."),
+        TipoCotizacion(nombre="CCL", descripcion="Contado con Liquidación."),
+        TipoCotizacion(nombre="Tarjeta", descripcion="Dólar para consumos con tarjeta en el exterior."),
+        TipoCotizacion(nombre="Mayorista", descripcion="Cotización mayorista del mercado cambiario."),
+        TipoCotizacion(nombre="Cripto", descripcion="Cotización del dólar en el mercado cripto."),
+        TipoCotizacion(nombre="Solidario", descripcion="Dólar ahorro con recargo solidario."),
+        TipoCotizacion(nombre="Qatar", descripcion="Cotización para consumos en el exterior."),
+        TipoCotizacion(nombre="Turista", descripcion="Cotización para gastos de turismo en el exterior."),
+    ]
+    tipos_cotizacion = [repo_tipo_cotizacion.crear(tipo) for tipo in tipos_cotizacion]
+
+    tipo_oficial, tipo_blue, tipo_mep = tipos_cotizacion[0], tipos_cotizacion[1], tipos_cotizacion[2]
+
     usd = next(moneda for moneda in monedas if moneda.codigo == "USD")
     ars = next(moneda for moneda in monedas if moneda.codigo == "ARS")
     fecha_base = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
     cotizaciones = [
-        (TipoCotizacion.OFICIAL, Decimal("1120"), Decimal("1160"), 0),
-        (TipoCotizacion.BLUE, Decimal("1280"), Decimal("1315"), 0),
-        (TipoCotizacion.MEP, Decimal("1230"), Decimal("1258"), 0),
-        (TipoCotizacion.OFICIAL, Decimal("1110"), Decimal("1148"), 1),
-        (TipoCotizacion.BLUE, Decimal("1265"), Decimal("1298"), 1),
-        (TipoCotizacion.MEP, Decimal("1218"), Decimal("1240"), 1),
-        (TipoCotizacion.OFICIAL, Decimal("1102"), Decimal("1139"), 2),
-        (TipoCotizacion.BLUE, Decimal("1257"), Decimal("1290"), 2),
-        (TipoCotizacion.MEP, Decimal("1204"), Decimal("1232"), 2),
-        (TipoCotizacion.OFICIAL, Decimal("1096"), Decimal("1130"), 3),
+        (tipo_oficial, Decimal("1120"), Decimal("1160"), 0),
+        (tipo_blue, Decimal("1280"), Decimal("1315"), 0),
+        (tipo_mep, Decimal("1230"), Decimal("1258"), 0),
+        (tipo_oficial, Decimal("1110"), Decimal("1148"), 1),
+        (tipo_blue, Decimal("1265"), Decimal("1298"), 1),
+        (tipo_mep, Decimal("1218"), Decimal("1240"), 1),
+        (tipo_oficial, Decimal("1102"), Decimal("1139"), 2),
+        (tipo_blue, Decimal("1257"), Decimal("1290"), 2),
+        (tipo_mep, Decimal("1204"), Decimal("1232"), 2),
+        (tipo_oficial, Decimal("1096"), Decimal("1130"), 3),
     ]
     for tipo, compra, venta, dias_atras in cotizaciones:
         repo_cotizacion.crear(
@@ -198,7 +218,10 @@ if __name__ == '__main__':
     repo_libro = RepositorioLibro(os.path.join(carpeta, ArchivoCsv.LIBRO.value), repo_editorial, repo_genero)
     repo_precio = RepositorioPrecio(os.path.join(carpeta, ArchivoCsv.PRECIO.value), repo_libro, repo_moneda)
     repo_stock = RepositorioStock(os.path.join(carpeta, ArchivoCsv.STOCK.value), repo_libro)
-    repo_cotizacion = RepositorioCotizacionDolar(os.path.join(carpeta, ArchivoCsv.COTIZACION.value), repo_moneda)
+    repo_tipo_cotizacion = RepositorioTipoCotizacion(os.path.join(carpeta, ArchivoCsv.TIPO_COTIZACION.value))
+    repo_cotizacion = RepositorioCotizacionDolar(
+        os.path.join(carpeta, ArchivoCsv.COTIZACION.value), repo_moneda, repo_tipo_cotizacion
+    )
 
     dibujar_separador("2. Cantidades cargadas")
     libros = repo_libro.leer_todos()
@@ -209,6 +232,7 @@ if __name__ == '__main__':
         "libros": len(libros),
         "precios": len(repo_precio.leer_todos()),
         "stock": len(repo_stock.leer_todos()),
+        "tipos_cotizacion": len(repo_tipo_cotizacion.leer_todos()),
     }
     for nombre, cantidad in cantidades.items():
         assert cantidad > 0, f"Sin datos de {nombre}"
@@ -223,8 +247,11 @@ if __name__ == '__main__':
     print("Todos los libros tienen stock")
 
     dibujar_separador("4. Cotizaciones")
-    for tipo in TipoCotizacion:
+    tipos = repo_tipo_cotizacion.leer_todos()
+    assert len(tipos) == 10, f"Se esperaban 10 tipos de cotización, hay {len(tipos)}"
+    print(f"Tipos de cotización: {len(tipos)}")
+    for tipo in tipos:
         historico = repo_cotizacion.leer_historico_por_tipo(tipo)
-        assert historico, f"Sin cotizaciones {tipo.value}"
-        print(f"{tipo.value}: {len(historico)} registros")
-        print(historico[0])
+        if historico:
+            print(f"{tipo.nombre}: {len(historico)} registros")
+            print(historico[0])

@@ -141,6 +141,15 @@ class IRepositorioStock(abc.ABC):
     pass
 
   @abc.abstractmethod
+  def leer_todos(self) -> List['Stock']:
+    """Lee todos los registros de stock.
+
+    Returns:
+        List[Stock]: Una lista con todos los registros de stock.
+    """
+    pass
+
+  @abc.abstractmethod
   def actualizar(self, stock: 'Stock') -> 'Stock':
     """Actualiza un registro de stock existente.
 
@@ -246,9 +255,19 @@ class RepositorioCSV(IRepositorio[T], Generic[T]):
 
     def __init__(self, ruta_archivo: str, entidad_cls: Type[T]) -> None:
         """Inicializa el repositorio con su ruta y clase de entidad."""
-        self.ruta_archivo = ruta_archivo
-        self.entidad_cls = entidad_cls
+        self._ruta_archivo = ruta_archivo
+        self._entidad_cls = entidad_cls
         self._asegurar_archivo()
+
+    @property
+    def ruta_archivo(self) -> str:
+        """Ruta del archivo CSV que respalda al repositorio."""
+        return self._ruta_archivo
+
+    @property
+    def entidad_cls(self) -> Type[T]:
+        """Clase de entidad que administra el repositorio."""
+        return self._entidad_cls
 
     def _asegurar_archivo(self) -> None:
         """Crea el directorio y el CSV con encabezado si todavía no existe."""
@@ -435,9 +454,19 @@ class RepositorioLibro(RepositorioCSV[Libro]):
 
     def __init__(self, ruta_archivo: str, repo_editorial: RepositorioEditorial, repo_genero: RepositorioGenero) -> None:
         """Inicializa el repositorio con sus dependencias relacionadas."""
-        self.repo_editorial = repo_editorial
-        self.repo_genero = repo_genero
+        self._repo_editorial = repo_editorial
+        self._repo_genero = repo_genero
         super().__init__(ruta_archivo, Libro)
+
+    @property
+    def repo_editorial(self) -> RepositorioEditorial:
+        """Repositorio de editoriales usado para resolver referencias."""
+        return self._repo_editorial
+
+    @property
+    def repo_genero(self) -> RepositorioGenero:
+        """Repositorio de géneros usado para resolver referencias."""
+        return self._repo_genero
 
     def _columnas(self) -> List[str]:
         """Define columnas del archivo de libros."""
@@ -492,9 +521,19 @@ class RepositorioPrecio(RepositorioCSV[Precio]):
 
     def __init__(self, ruta_archivo: str, repo_libro: RepositorioLibro, repo_moneda: RepositorioMoneda) -> None:
         """Inicializa el repositorio de precios con sus dependencias."""
-        self.repo_libro = repo_libro
-        self.repo_moneda = repo_moneda
+        self._repo_libro = repo_libro
+        self._repo_moneda = repo_moneda
         super().__init__(ruta_archivo, Precio)
+
+    @property
+    def repo_libro(self) -> RepositorioLibro:
+        """Repositorio de libros usado para resolver referencias."""
+        return self._repo_libro
+
+    @property
+    def repo_moneda(self) -> RepositorioMoneda:
+        """Repositorio de monedas usado para resolver referencias."""
+        return self._repo_moneda
 
     def _columnas(self) -> List[str]:
         """Define columnas del archivo de precios."""
@@ -525,14 +564,52 @@ class RepositorioPrecio(RepositorioCSV[Precio]):
         )
 
 
+class RepositorioTipoCotizacion(RepositorioCSV[TipoCotizacion]):
+    """Repositorio CSV de tipos de cotización."""
+
+    def __init__(self, ruta_archivo: str) -> None:
+        """Inicializa el repositorio de tipos de cotización."""
+        super().__init__(ruta_archivo, TipoCotizacion)
+
+    def _columnas(self) -> List[str]:
+        """Define columnas del archivo de tipos de cotización."""
+        return ["id", "nombre", "descripcion"]
+
+    def _a_fila(self, entidad: TipoCotizacion) -> Dict[str, str]:
+        """Serializa un tipo de cotización a fila CSV."""
+        return {
+            "id": str(entidad.id),
+            "nombre": entidad.nombre,
+            "descripcion": entidad.descripcion or "",
+        }
+
+    def _desde_fila(self, fila: Dict[str, str]) -> TipoCotizacion:
+        """Construye un tipo de cotización desde una fila CSV."""
+        return TipoCotizacion(
+            id=int(fila["id"]),
+            nombre=fila["nombre"],
+            descripcion=fila["descripcion"] or None,
+        )
+
+
 class RepositorioStock(IRepositorioStock):
     """Repositorio CSV de stock con unicidad por libro."""
 
     def __init__(self, ruta_archivo: str, repo_libro: RepositorioLibro) -> None:
         """Inicializa el repositorio de stock con acceso a libros."""
-        self.ruta_archivo = ruta_archivo
-        self.repo_libro = repo_libro
+        self._ruta_archivo = ruta_archivo
+        self._repo_libro = repo_libro
         _asegurar_csv(self.ruta_archivo, self._columnas())
+
+    @property
+    def ruta_archivo(self) -> str:
+        """Ruta del archivo CSV que respalda al repositorio."""
+        return self._ruta_archivo
+
+    @property
+    def repo_libro(self) -> RepositorioLibro:
+        """Repositorio de libros usado para resolver referencias."""
+        return self._repo_libro
 
     def _columnas(self) -> List[str]:
         """Define columnas del archivo de stock."""
@@ -612,17 +689,38 @@ class RepositorioStock(IRepositorioStock):
 class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
     """Repositorio CSV de cotizaciones del dólar por tipo y fecha."""
 
-    def __init__(self, ruta_archivo: str, repo_moneda: RepositorioMoneda) -> None:
-        """Inicializa el repositorio de cotizaciones con acceso a monedas."""
-        self.ruta_archivo = ruta_archivo
-        self.repo_moneda = repo_moneda
+    def __init__(
+        self,
+        ruta_archivo: str,
+        repo_moneda: RepositorioMoneda,
+        repo_tipo_cotizacion: RepositorioTipoCotizacion,
+    ) -> None:
+        """Inicializa el repositorio de cotizaciones con acceso a monedas y tipos."""
+        self._ruta_archivo = ruta_archivo
+        self._repo_moneda = repo_moneda
+        self._repo_tipo_cotizacion = repo_tipo_cotizacion
         _asegurar_csv(self.ruta_archivo, self._columnas())
+
+    @property
+    def ruta_archivo(self) -> str:
+        """Ruta del archivo CSV que respalda al repositorio."""
+        return self._ruta_archivo
+
+    @property
+    def repo_moneda(self) -> RepositorioMoneda:
+        """Repositorio de monedas usado para resolver referencias."""
+        return self._repo_moneda
+
+    @property
+    def repo_tipo_cotizacion(self) -> RepositorioTipoCotizacion:
+        """Repositorio de tipos de cotización usado para resolver referencias."""
+        return self._repo_tipo_cotizacion
 
     def _columnas(self) -> List[str]:
         """Define columnas del archivo de cotizaciones."""
         return [
             "id",
-            "tipo",
+            "tipo_id",
             "moneda_origen_id",
             "moneda_destino_id",
             "valor_compra",
@@ -634,7 +732,7 @@ class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
         """Serializa una cotización a fila CSV."""
         return {
             "id": str(entidad.id),
-            "tipo": entidad.tipo.value,
+            "tipo_id": str(entidad.tipo.id),
             "moneda_origen_id": str(entidad.moneda_origen.id),
             "moneda_destino_id": str(entidad.moneda_destino.id),
             "valor_compra": str(entidad.valor_compra),
@@ -644,13 +742,14 @@ class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
 
     def _desde_fila(self, fila: Dict[str, str]) -> CotizacionDolar:
         """Reconstruye una cotización desde CSV."""
+        tipo = self.repo_tipo_cotizacion.leer_por_id(int(fila["tipo_id"]))
         moneda_origen = self.repo_moneda.leer_por_id(int(fila["moneda_origen_id"]))
         moneda_destino = self.repo_moneda.leer_por_id(int(fila["moneda_destino_id"]))
-        if not moneda_origen or not moneda_destino:
-            raise RepositorioError("No se pudo reconstruir la cotización por monedas inexistentes.")
+        if not tipo or not moneda_origen or not moneda_destino:
+            raise RepositorioError("No se pudo reconstruir la cotización por referencias inexistentes.")
         return CotizacionDolar(
             id=int(fila["id"]),
-            tipo=TipoCotizacion(fila["tipo"]),
+            tipo=tipo,
             moneda_origen=moneda_origen,
             moneda_destino=moneda_destino,
             valor_compra=Decimal(fila["valor_compra"]),
@@ -674,22 +773,26 @@ class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
 
     def leer_por_tipo_y_fecha(
         self,
-        tipo_id: Union[int, TipoCotizacion, str],
+        tipo_id: Union[int, TipoCotizacion],
         fecha: date,
     ) -> Optional[CotizacionDolar]:
         """Busca cotización por tipo y fecha (ignorando hora)."""
         tipo = self._normalizar_tipo(tipo_id)
         for fila in _leer_csv(self.ruta_archivo):
             fecha_fila = datetime.fromisoformat(fila["fecha"]).date()
-            if fila["tipo"] == tipo.value and fecha_fila == fecha:
+            if int(fila["tipo_id"]) == tipo.id and fecha_fila == fecha:
                 return self._desde_fila(fila)
         return None
 
-    def leer_historico_por_tipo(self, tipo_id: Union[int, TipoCotizacion, str]) -> List[CotizacionDolar]:
+    def leer_todos(self) -> List[CotizacionDolar]:
+        """Lee todas las cotizaciones registradas."""
+        return [self._desde_fila(fila) for fila in _leer_csv(self.ruta_archivo)]
+
+    def leer_historico_por_tipo(self, tipo_id: Union[int, TipoCotizacion]) -> List[CotizacionDolar]:
         """Lista histórico de cotizaciones para un tipo dado."""
         tipo = self._normalizar_tipo(tipo_id)
         cotizaciones = [
-            self._desde_fila(fila) for fila in _leer_csv(self.ruta_archivo) if fila["tipo"] == tipo.value
+            self._desde_fila(fila) for fila in _leer_csv(self.ruta_archivo) if int(fila["tipo_id"]) == tipo.id
         ]
         return sorted(cotizaciones, key=lambda c: c.fecha)
 
@@ -706,30 +809,25 @@ class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
                 return cotizacion
         raise RepositorioError(f"No existe una cotización con id {cotizacion.id} para actualizar.")
 
-    def eliminar(self, tipo_id: Union[int, TipoCotizacion, str], fecha: date) -> bool:
+    def eliminar(self, tipo_id: Union[int, TipoCotizacion], fecha: date) -> bool:
         """Elimina una cotización por tipo y fecha."""
         tipo = self._normalizar_tipo(tipo_id)
         filas = _leer_csv(self.ruta_archivo)
         filas_filtradas = [
             fila
             for fila in filas
-            if not (fila["tipo"] == tipo.value and datetime.fromisoformat(fila["fecha"]).date() == fecha)
+            if not (int(fila["tipo_id"]) == tipo.id and datetime.fromisoformat(fila["fecha"]).date() == fecha)
         ]
         if len(filas_filtradas) == len(filas):
             return False
         _escribir_csv(self.ruta_archivo, self._columnas(), filas_filtradas)
         return True
 
-    def _normalizar_tipo(self, tipo_id: Union[int, TipoCotizacion, str]) -> TipoCotizacion:
-        """Normaliza el tipo de cotización recibido a enum TipoCotizacion."""
+    def _normalizar_tipo(self, tipo_id: Union[int, TipoCotizacion]) -> TipoCotizacion:
+        """Normaliza el tipo de cotización recibido a una entidad TipoCotizacion."""
         if isinstance(tipo_id, TipoCotizacion):
             return tipo_id
-        if isinstance(tipo_id, int):
-            opciones = list(TipoCotizacion)
-            if 0 <= tipo_id < len(opciones):
-                return opciones[tipo_id]
-            raise RepositorioError("Índice de tipo de cotización fuera de rango.")
-        for tipo in TipoCotizacion:
-            if tipo.value.lower() == str(tipo_id).strip().lower() or tipo.name.lower() == str(tipo_id).strip().lower():
-                return tipo
-        raise RepositorioError(f"Tipo de cotización inválido: {tipo_id}.")
+        tipo = self.repo_tipo_cotizacion.leer_por_id(int(tipo_id))
+        if not tipo:
+            raise RepositorioError(f"No existe el tipo de cotización con id {tipo_id}.")
+        return tipo

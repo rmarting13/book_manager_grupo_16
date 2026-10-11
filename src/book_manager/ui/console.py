@@ -18,6 +18,7 @@ from book_manager.services.services import (
     ServicioLibro,
     ServicioPrecio,
     ServicioStock,
+    ServicioTipoCotizacion,
 )
 
 Opcion = Tuple[str, Callable[[], None]]
@@ -146,7 +147,8 @@ class ConsolaInventario:
 
     def __init__( self,servicio_libros: ServicioLibro,servicio_generos: ServicioGenero,servicio_editoriales: ServicioEditorial,
                   servicio_precios: ServicioPrecio,servicio_stock: ServicioStock,servicio_monedas: MonedaServicio,
-                  servicio_cotizaciones: ServicioCotizacionDolar ) -> None:
+                  servicio_cotizaciones: ServicioCotizacionDolar,
+                  servicio_tipos_cotizacion: ServicioTipoCotizacion ) -> None:
         self._libros = servicio_libros
         self._generos = servicio_generos
         self._editoriales = servicio_editoriales
@@ -154,6 +156,47 @@ class ConsolaInventario:
         self._stock = servicio_stock
         self._monedas = servicio_monedas
         self._cotizaciones = servicio_cotizaciones
+        self._tipos_cotizacion = servicio_tipos_cotizacion
+
+    @property
+    def servicio_libros(self) -> ServicioLibro:
+        """Servicio de libros utilizado por la consola."""
+        return self._libros
+
+    @property
+    def servicio_generos(self) -> ServicioGenero:
+        """Servicio de géneros utilizado por la consola."""
+        return self._generos
+
+    @property
+    def servicio_editoriales(self) -> ServicioEditorial:
+        """Servicio de editoriales utilizado por la consola."""
+        return self._editoriales
+
+    @property
+    def servicio_precios(self) -> ServicioPrecio:
+        """Servicio de precios utilizado por la consola."""
+        return self._precios
+
+    @property
+    def servicio_stock(self) -> ServicioStock:
+        """Servicio de stock utilizado por la consola."""
+        return self._stock
+
+    @property
+    def servicio_monedas(self) -> MonedaServicio:
+        """Servicio de monedas utilizado por la consola."""
+        return self._monedas
+
+    @property
+    def servicio_cotizaciones(self) -> ServicioCotizacionDolar:
+        """Servicio de cotizaciones utilizado por la consola."""
+        return self._cotizaciones
+
+    @property
+    def servicio_tipos_cotizacion(self) -> ServicioTipoCotizacion:
+        """Servicio de tipos de cotización utilizado por la consola."""
+        return self._tipos_cotizacion
 
     def ejecutar(self) -> None:
         PrinterUtil.dibujar_separador('INVENTARIO DE LIBRERIA')
@@ -162,8 +205,10 @@ class ConsolaInventario:
                 ("Gestionar libros", self._menu_libros),
                 ("Gestionar géneros", self._menu_generos),
                 ("Gestionar editoriales", self._menu_editoriales),
+                ("Gestionar monedas", self._menu_monedas),
                 ("Gestionar precios", self._menu_precios),
                 ("Gestionar stock", self._menu_stock),
+                ("Gestionar tipos de cotización", self._menu_tipos_cotizacion),
                 ("Cotizaciones del dólar", self._menu_cotizaciones),
             ], salir="Salir")
         except (EOFError, KeyboardInterrupt):
@@ -483,6 +528,116 @@ class ConsolaInventario:
             print("Operación cancelada por el usuario.")
 
 
+    def _menu_monedas(self) -> None:
+        self._menu("MONEDAS", [
+            ("Crear moneda", self._crear_moneda),
+            ("Listar monedas", self._listar_monedas),
+            ("Ver moneda por ID", self._ver_moneda),
+            ("Buscar moneda por código", self._buscar_moneda),
+            ("Actualizar moneda", self._actualizar_moneda),
+            ("Eliminar moneda", self._eliminar_moneda),
+        ])
+
+    def _crear_moneda(self) -> None:
+        moneda = self._monedas.crear(Moneda(
+            codigo=pedir_texto("Código ISO (3 letras)"),
+            nombre=pedir_texto("Nombre"),
+            simbolo=pedir_texto("Símbolo"),
+        ))
+        print(f"Moneda creada: [{moneda.id}] {moneda.codigo} - {moneda.nombre}")
+
+    def _listar_monedas(self) -> None:
+        monedas = self._monedas.listar()
+        if not monedas:
+            print("No hay monedas cargadas.")
+            return
+        PrinterUtil.imprimir_tabla(
+            ["ID", "Código", "Nombre", "Símbolo"],
+            [[str(m.id), m.codigo, m.nombre, m.simbolo] for m in monedas],
+        )
+
+    def _ver_moneda(self) -> None:
+        m = self._monedas.obtener(pedir_entero("ID de la moneda", minimo=1))
+        print(f"  ID: {m.id}\n  Código: {m.codigo}\n  Nombre: {m.nombre}\n  Símbolo: {m.simbolo}")
+
+    def _buscar_moneda(self) -> None:
+        m = self._monedas.obtener_por_codigo(pedir_texto("Código ISO"))
+        if not m:
+            print("No se encontró una moneda con ese código.")
+            return
+        PrinterUtil.imprimir_tabla(
+            ["ID", "Código", "Nombre", "Símbolo"],
+            [[str(m.id), m.codigo, m.nombre, m.simbolo]],
+        )
+
+    def _actualizar_moneda(self) -> None:
+        actual = self._monedas.obtener(pedir_entero("ID de la moneda a actualizar", minimo=1))
+        print("  (Enter para conservar el valor actual)")
+        moneda = self._monedas.actualizar(Moneda(
+            id=actual.id,
+            codigo=editar_texto("Código ISO", actual.codigo),
+            nombre=editar_texto("Nombre", actual.nombre),
+            simbolo=editar_texto("Símbolo", actual.simbolo),
+        ))
+        print(f"Moneda actualizada: [{moneda.id}] {moneda.codigo} - {moneda.nombre}")
+
+    def _eliminar_moneda(self) -> None:
+        m = self._monedas.obtener(pedir_entero("ID de la moneda a eliminar", minimo=1))
+        if confirmar(f"¿Eliminar la moneda '{m.codigo} - {m.nombre}'?"):
+            self._monedas.eliminar(m.id)
+            print("Moneda eliminada.")
+        else:
+            print("Operación cancelada por el usuario.")
+
+
+    def _menu_tipos_cotizacion(self) -> None:
+        self._menu("TIPOS DE COTIZACIÓN", [
+            ("Crear tipo de cotización", self._crear_tipo_cotizacion),
+            ("Listar tipos de cotización", self._listar_tipos_cotizacion),
+            ("Ver tipo de cotización por ID", self._ver_tipo_cotizacion),
+            ("Actualizar tipo de cotización", self._actualizar_tipo_cotizacion),
+            ("Eliminar tipo de cotización", self._eliminar_tipo_cotizacion),
+        ])
+
+    def _crear_tipo_cotizacion(self) -> None:
+        tipo = self._tipos_cotizacion.crear(TipoCotizacion(
+            nombre=pedir_texto("Nombre"),
+            descripcion=pedir_opcional("Descripción"),
+        ))
+        print(f"Tipo de cotización creado: [{tipo.id}] {tipo.nombre}")
+
+    def _listar_tipos_cotizacion(self) -> None:
+        tipos = self._tipos_cotizacion.listar()
+        if not tipos:
+            print("No hay tipos de cotización cargados.")
+            return
+        PrinterUtil.imprimir_tabla(
+            ["ID", "Nombre", "Descripción"],
+            [[str(t.id), t.nombre, t.descripcion or "-"] for t in tipos],
+        )
+
+    def _ver_tipo_cotizacion(self) -> None:
+        t = self._tipos_cotizacion.obtener(pedir_entero("ID del tipo de cotización", minimo=1))
+        print(f"  ID: {t.id}\n  Nombre: {t.nombre}\n  Descripción: {t.descripcion or '-'}")
+
+    def _actualizar_tipo_cotizacion(self) -> None:
+        actual = self._tipos_cotizacion.obtener(pedir_entero("ID del tipo de cotización a actualizar", minimo=1))
+        print("  (Enter para conservar el valor actual)")
+        tipo = self._tipos_cotizacion.actualizar(TipoCotizacion(
+            id=actual.id,
+            nombre=editar_texto("Nombre", actual.nombre),
+            descripcion=editar_texto("Descripción", actual.descripcion or "") or None,
+        ))
+        print(f"Tipo de cotización actualizado: [{tipo.id}] {tipo.nombre}")
+
+    def _eliminar_tipo_cotizacion(self) -> None:
+        t = self._tipos_cotizacion.obtener(pedir_entero("ID del tipo de cotización a eliminar", minimo=1))
+        if confirmar(f"¿Eliminar el tipo de cotización '{t.nombre}'?"):
+            self._tipos_cotizacion.eliminar(t.id)
+            print("Tipo de cotización eliminado.")
+        else:
+            print("Operación cancelada por el usuario.")
+
 
     def _menu_stock(self) -> None:
         self._menu("STOCK", [
@@ -629,15 +784,15 @@ class ConsolaInventario:
             ("Convertir USD a pesos", self._convertir_usd),
         ])
 
-    @staticmethod
-    def _elegir_tipo_cotizacion() -> TipoCotizacion:
-        tipos = list(TipoCotizacion)
-        for i, tipo in enumerate(tipos, start=1):
-            print(f"    {i}. {tipo.value}")
-        numero = pedir_entero("Número de tipo", minimo=1)
-        if numero > len(tipos):
-            raise ServicioError("Tipo de cotización inválido.")
-        return tipos[numero - 1]
+    def _elegir_tipo_cotizacion(self, actual: Optional[TipoCotizacion] = None) -> TipoCotizacion:
+        tipos = self._tipos_cotizacion.listar()
+        if not tipos:
+            raise ServicioError("Debe crear al menos un tipo de cotización.")
+        print("Tipos de cotización disponibles:")
+        PrinterUtil.imprimir_tabla(["ID", "Nombre"], [[str(t.id), t.nombre] for t in tipos])
+        if actual is None:
+            return self._tipos_cotizacion.obtener(pedir_entero("ID del tipo de cotización", minimo=1))
+        return self._tipos_cotizacion.obtener(editar_entero("ID del tipo de cotización", actual.id, minimo=1))
 
     def _moneda_por_codigo(self, codigo: str) -> Moneda:
         moneda = self._monedas.obtener_por_codigo(codigo)
@@ -652,8 +807,8 @@ class ConsolaInventario:
             return
         PrinterUtil.imprimir_tabla(
             ["Tipo", "Fecha", "Par", "Compra", "Venta"],
-            [[c.tipo.value, c.fecha.strftime("%Y-%m-%d %H:%M"),
-              f"{c.moneda_origen.codigo}/{c.moneda_destino.codigo}",
+            [[c.tipo.nombre, c.fecha.strftime("%Y-%m-%d %H:%M"),
+              c.par_monedas,
               f"{c.valor_compra:,.2f}", f"{c.valor_venta:,.2f}"] for c in cotizaciones]
         )
 
@@ -699,7 +854,7 @@ class ConsolaInventario:
         tipo = self._elegir_tipo_cotizacion()
         fecha = pedir_fecha("Fecha de la cotización", date.today())
         self._cotizaciones.obtener(tipo, fecha)
-        if confirmar(f"¿Eliminar la cotización {tipo.value} del {fecha.isoformat()}?"):
+        if confirmar(f"¿Eliminar la cotización {tipo.nombre} del {fecha.isoformat()}?"):
             self._cotizaciones.eliminar(tipo, fecha)
             print("Cotización eliminada.")
         else:
@@ -710,4 +865,4 @@ class ConsolaInventario:
         monto = pedir_decimal("Monto en USD")
         usar_venta = confirmar("¿Usar cotización de venta? (n = compra)")
         total = self._cotizaciones.convertir(monto, tipo, usar_venta)
-        print(f"USD {monto:,.2f} = ARS {total:,.2f} (dólar {tipo.value})")
+        print(f"USD {monto:,.2f} = ARS {total:,.2f} (dólar {tipo.nombre})")

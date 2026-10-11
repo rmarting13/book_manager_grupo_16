@@ -20,6 +20,7 @@ from book_manager.repositories.repositories import (
     RepositorioMoneda,
     RepositorioPrecio,
     RepositorioStock,
+    RepositorioTipoCotizacion,
 )
 
 
@@ -32,9 +33,24 @@ class MonedaServicio:
     """Servicio para operaciones con monedas."""
 
     def __init__( self, repo_moneda: RepositorioMoneda, repo_precio: RepositorioPrecio,repo_cotizacion: RepositorioCotizacionDolar) -> None:
-        self.repo_moneda = repo_moneda
-        self.repo_precio = repo_precio
-        self.repo_cotizacion = repo_cotizacion
+        self._repo_moneda = repo_moneda
+        self._repo_precio = repo_precio
+        self._repo_cotizacion = repo_cotizacion
+
+    @property
+    def repo_moneda(self) -> RepositorioMoneda:
+        """Repositorio de monedas utilizado por el servicio."""
+        return self._repo_moneda
+
+    @property
+    def repo_precio(self) -> RepositorioPrecio:
+        """Repositorio de precios utilizado para validar referencias."""
+        return self._repo_precio
+
+    @property
+    def repo_cotizacion(self) -> RepositorioCotizacionDolar:
+        """Repositorio de cotizaciones utilizado para validar referencias."""
+        return self._repo_cotizacion
 
     def crear(self, moneda: Moneda) -> Moneda:
         """Crea una moneda validando que el código sea único."""
@@ -57,10 +73,9 @@ class MonedaServicio:
         self.obtener(id)
         if any(p.moneda.id == id for p in self.repo_precio.leer_todos()):
             raise ServicioError("Imposible eliminar moneda: referencias de uso en precios.")
-        for tipo in TipoCotizacion:
-            for c in self.repo_cotizacion.leer_historico_por_tipo(tipo):
-                if id in (c.moneda_origen.id, c.moneda_destino.id):
-                    raise ServicioError("Imposible eliminar moneda: referencias de uso en cotizaciones.")
+        for cotizacion in self.repo_cotizacion.leer_todos():
+            if id in (cotizacion.moneda_origen.id, cotizacion.moneda_destino.id):
+                raise ServicioError("Imposible eliminar moneda: referencias de uso en cotizaciones.")
         return self.repo_moneda.eliminar(id)
     
     
@@ -91,8 +106,18 @@ class ServicioGenero:
     """Servicio para operaciones sobre Género."""
 
     def __init__(self, repo_genero: RepositorioGenero, repo_libro: RepositorioLibro) -> None:
-        self.repo_genero = repo_genero
-        self.repo_libro = repo_libro
+        self._repo_genero = repo_genero
+        self._repo_libro = repo_libro
+
+    @property
+    def repo_genero(self) -> RepositorioGenero:
+        """Repositorio de géneros utilizado por el servicio."""
+        return self._repo_genero
+
+    @property
+    def repo_libro(self) -> RepositorioLibro:
+        """Repositorio de libros utilizado para validar referencias."""
+        return self._repo_libro
 
     def crear(self, genero: Genero) -> Genero:
         """crea Genero con validación de nombre."""
@@ -139,8 +164,18 @@ class ServicioEditorial:
     """Servicio para operaciones sobre Editoriales."""
 
     def __init__(self, repo_editorial: RepositorioEditorial, repo_libro: RepositorioLibro) -> None:
-        self.repo_editorial = repo_editorial
-        self.repo_libro = repo_libro
+        self._repo_editorial = repo_editorial
+        self._repo_libro = repo_libro
+
+    @property
+    def repo_editorial(self) -> RepositorioEditorial:
+        """Repositorio de editoriales utilizado por el servicio."""
+        return self._repo_editorial
+
+    @property
+    def repo_libro(self) -> RepositorioLibro:
+        """Repositorio de libros utilizado para validar referencias."""
+        return self._repo_libro
 
     def crear(self, editorial: Editorial) -> Editorial:
         """Crea un nuevo Editorial validando duplicidad"""
@@ -187,11 +222,36 @@ class ServicioLibro:
 
     def __init__(self,repo_libro: RepositorioLibro,repo_editorial: RepositorioEditorial,
                 repo_genero: RepositorioGenero,repo_precio: RepositorioPrecio,repo_stock: RepositorioStock) -> None:
-        self.repo_libro = repo_libro
-        self.repo_editorial = repo_editorial
-        self.repo_genero = repo_genero
-        self.repo_precio = repo_precio
-        self.repo_stock = repo_stock
+        self._repo_libro = repo_libro
+        self._repo_editorial = repo_editorial
+        self._repo_genero = repo_genero
+        self._repo_precio = repo_precio
+        self._repo_stock = repo_stock
+
+    @property
+    def repo_libro(self) -> RepositorioLibro:
+        """Repositorio de libros utilizado por el servicio."""
+        return self._repo_libro
+
+    @property
+    def repo_editorial(self) -> RepositorioEditorial:
+        """Repositorio de editoriales utilizado para validar referencias."""
+        return self._repo_editorial
+
+    @property
+    def repo_genero(self) -> RepositorioGenero:
+        """Repositorio de géneros utilizado para validar referencias."""
+        return self._repo_genero
+
+    @property
+    def repo_precio(self) -> RepositorioPrecio:
+        """Repositorio de precios utilizado para validar referencias."""
+        return self._repo_precio
+
+    @property
+    def repo_stock(self) -> RepositorioStock:
+        """Repositorio de stock utilizado para validar referencias."""
+        return self._repo_stock
 
     def crear(self, libro: Libro) -> Libro:
         """Crea un Libro validando ISBN"""
@@ -268,9 +328,24 @@ class ServicioPrecio:
         repo_libro: RepositorioLibro,
         repo_moneda: RepositorioMoneda,
     ) -> None:
-        self.repo_precio = repo_precio
-        self.repo_libro = repo_libro
-        self.repo_moneda = repo_moneda
+        self._repo_precio = repo_precio
+        self._repo_libro = repo_libro
+        self._repo_moneda = repo_moneda
+
+    @property
+    def repo_precio(self) -> RepositorioPrecio:
+        """Repositorio de precios utilizado por el servicio."""
+        return self._repo_precio
+
+    @property
+    def repo_libro(self) -> RepositorioLibro:
+        """Repositorio de libros utilizado para validar referencias."""
+        return self._repo_libro
+
+    @property
+    def repo_moneda(self) -> RepositorioMoneda:
+        """Repositorio de monedas utilizado para validar referencias."""
+        return self._repo_moneda
 
     def crear(self, precio: Precio) -> Precio:
         """"
@@ -343,8 +418,18 @@ class ServicioStock:
     """Servicio para operaciones sobre Stock disponible de Libro."""
 
     def __init__(self, repo_stock: RepositorioStock, repo_libro: RepositorioLibro) -> None:
-        self.repo_stock = repo_stock
-        self.repo_libro = repo_libro
+        self._repo_stock = repo_stock
+        self._repo_libro = repo_libro
+
+    @property
+    def repo_stock(self) -> RepositorioStock:
+        """Repositorio de stock utilizado por el servicio."""
+        return self._repo_stock
+
+    @property
+    def repo_libro(self) -> RepositorioLibro:
+        """Repositorio de libros utilizado para validar referencias."""
+        return self._repo_libro
 
     def crear(self, stock: Stock) -> Stock:
         """Crea Stock de un libro existente"""
@@ -409,61 +494,140 @@ class ServicioStock:
             raise ServicioError("La cantidad no puede negativa.")
 
 
+class ServicioTipoCotizacion:
+    """Servicio para operaciones sobre TipoCotizacion."""
+
+    def __init__(self, repo_tipo_cotizacion: RepositorioTipoCotizacion, repo_cotizacion: RepositorioCotizacionDolar) -> None:
+        self._repo_tipo_cotizacion = repo_tipo_cotizacion
+        self._repo_cotizacion = repo_cotizacion
+
+    @property
+    def repo_tipo_cotizacion(self) -> RepositorioTipoCotizacion:
+        """Repositorio de tipos de cotización utilizado por el servicio."""
+        return self._repo_tipo_cotizacion
+
+    @property
+    def repo_cotizacion(self) -> RepositorioCotizacionDolar:
+        """Repositorio de cotizaciones utilizado para validar referencias."""
+        return self._repo_cotizacion
+
+    def crear(self, tipo: TipoCotizacion) -> TipoCotizacion:
+        """Crea un tipo de cotización validando que el nombre sea único."""
+        if self._buscar_por_nombre(tipo.nombre):
+            raise ServicioError(f"Ya existe el tipo de cotización '{tipo.nombre}'.")
+        return self.repo_tipo_cotizacion.crear(tipo)
+
+    def actualizar(self, tipo: TipoCotizacion) -> TipoCotizacion:
+        """Actualiza un tipo de cotización validando existencia y duplicidad."""
+        self.obtener(tipo.id)
+        otro = self._buscar_por_nombre(tipo.nombre)
+        if otro and otro.id != tipo.id:
+            raise ServicioError(f"Ya existe el tipo de cotización '{tipo.nombre}'.")
+        return self.repo_tipo_cotizacion.actualizar(tipo)
+
+    def eliminar(self, id: int) -> bool:
+        """Elimina un tipo de cotización validando referencias de uso."""
+        self.obtener(id)
+        if self.repo_cotizacion.leer_historico_por_tipo(id):
+            raise ServicioError("Imposible eliminar tipo de cotización: referencias de uso en cotizaciones.")
+        return self.repo_tipo_cotizacion.eliminar(id)
+
+    def obtener(self, id: int) -> TipoCotizacion:
+        """Filtra un tipo de cotización por id."""
+        tipo = self.repo_tipo_cotizacion.leer_por_id(id)
+        if not tipo:
+            raise ServicioError(f"No se encontró tipo de cotización con id {id}.")
+        return tipo
+
+    def obtener_por_nombre(self, nombre: str) -> Optional[TipoCotizacion]:
+        """Filtra un tipo de cotización por nombre."""
+        return self._buscar_por_nombre(nombre)
+
+    def listar(self) -> List[TipoCotizacion]:
+        """Retorna todos los tipos de cotización."""
+        return self.repo_tipo_cotizacion.leer_todos()
+
+    def _buscar_por_nombre(self, nombre: str) -> Optional[TipoCotizacion]:
+        nombre = nombre.strip().lower()
+        return next((t for t in self.repo_tipo_cotizacion.leer_todos() if t.nombre.lower() == nombre), None)
+
+
 class ServicioCotizacionDolar:
     """Servicio para operaciones sobre CotizacionDolar."""
 
-    def __init__(self, repo_cotizacion: RepositorioCotizacionDolar, repo_moneda: RepositorioMoneda) -> None:
-        self.repo_cotizacion = repo_cotizacion
-        self.repo_moneda = repo_moneda
+    def __init__(
+        self,
+        repo_cotizacion: RepositorioCotizacionDolar,
+        repo_moneda: RepositorioMoneda,
+        repo_tipo_cotizacion: RepositorioTipoCotizacion,
+    ) -> None:
+        self._repo_cotizacion = repo_cotizacion
+        self._repo_moneda = repo_moneda
+        self._repo_tipo_cotizacion = repo_tipo_cotizacion
+
+    @property
+    def repo_cotizacion(self) -> RepositorioCotizacionDolar:
+        """Repositorio de cotizaciones utilizado por el servicio."""
+        return self._repo_cotizacion
+
+    @property
+    def repo_moneda(self) -> RepositorioMoneda:
+        """Repositorio de monedas utilizado para validar referencias."""
+        return self._repo_moneda
+
+    @property
+    def repo_tipo_cotizacion(self) -> RepositorioTipoCotizacion:
+        """Repositorio de tipos de cotización utilizado para validar referencias."""
+        return self._repo_tipo_cotizacion
 
     def crear(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
         """Crea una nueva cotización diaria"""
 
-        self._validar_monedas(cotizacion)
-        if self.repo_cotizacion.leer_por_tipo_y_fecha(cotizacion.tipo, cotizacion.fecha.date()):  # type: ignore[arg-type]
-            raise ServicioError(f"Ya existe una cotización {cotizacion.tipo.value} para esa fecha.")
+        self._validar_referencias(cotizacion)
+        if self.repo_cotizacion.leer_por_tipo_y_fecha(cotizacion.tipo, cotizacion.fecha.date()):
+            raise ServicioError(f"Ya existe una cotización {cotizacion.tipo.nombre} para esa fecha.")
         return self.repo_cotizacion.crear(cotizacion)
 
     def actualizar(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
         """actualiza una cotización existente."""
 
-        self._validar_monedas(cotizacion)
-        existente = self.repo_cotizacion.leer_por_tipo_y_fecha(cotizacion.tipo, cotizacion.fecha.date())  # type: ignore[arg-type]
+        self._validar_referencias(cotizacion)
+        existente = self.repo_cotizacion.leer_por_tipo_y_fecha(cotizacion.tipo, cotizacion.fecha.date())
         if existente and existente.id != cotizacion.id:
-            raise ServicioError(f"Ya existe otra cotización {cotizacion.tipo.value} para esa fecha.")
+            raise ServicioError(f"Ya existe otra cotización {cotizacion.tipo.nombre} para esa fecha.")
         return self.repo_cotizacion.actualizar(cotizacion)
 
     
 
-    def eliminar(self, tipo: Union[TipoCotizacion, str], fecha: date) -> bool:
+    def eliminar(self, tipo: Union[TipoCotizacion, int], fecha: date) -> bool:
         """Elimina una CotizacionDolar por tipo y fecha."""
         self.obtener(tipo, fecha)
-        return self.repo_cotizacion.eliminar(tipo, fecha)  # type: ignore[arg-type]
+        return self.repo_cotizacion.eliminar(tipo, fecha)
     
-    def obtener(self, tipo: Union[TipoCotizacion, str], fecha: date) -> CotizacionDolar:
+    def obtener(self, tipo: Union[TipoCotizacion, int], fecha: date) -> CotizacionDolar:
         """Recupera una CotizacionDolar por tipo y fecha."""
-        cotizacion = self.repo_cotizacion.leer_por_tipo_y_fecha(tipo, fecha)  # type: ignore[arg-type]
+        cotizacion = self.repo_cotizacion.leer_por_tipo_y_fecha(tipo, fecha)
         if not cotizacion:
-            raise ServicioError(f"No hay cotización {tipo} para el {fecha.isoformat()}.")
+            raise ServicioError(f"No hay cotización {self._nombre_tipo(tipo)} para el {fecha.isoformat()}.")
         return cotizacion
 
     
-    def historico(self, tipo: Union[TipoCotizacion, str]) -> List[CotizacionDolar]:
+    def historico(self, tipo: Union[TipoCotizacion, int]) -> List[CotizacionDolar]:
         """
             retorna el histórico de un tipo de cotización ordenado por fecha
         """
-        return self.repo_cotizacion.leer_historico_por_tipo(tipo)  # type: ignore[arg-type]
+        return self.repo_cotizacion.leer_historico_por_tipo(tipo)
 
-    def obtener_ultima(self, tipo: Union[TipoCotizacion, str]) -> CotizacionDolar:
+    def obtener_ultima(self, tipo: Union[TipoCotizacion, int]) -> CotizacionDolar:
         """retorna la CotizacionDolar más reciente de un tipo."""
 
         historico = self.historico(tipo)
         if not historico:
-            raise ServicioError(f"No existen cotizaciones del tipo {tipo}.")
+            raise ServicioError(f"No existen cotizaciones del tipo {self._nombre_tipo(tipo)}.")
         return historico[-1]
 
 
-    def convertir(self, monto_usd: Decimal, tipo: Union[TipoCotizacion, str], usar_venta: bool = True) -> Decimal:
+    def convertir(self, monto_usd: Decimal, tipo: Union[TipoCotizacion, int], usar_venta: bool = True) -> Decimal:
         """
             Realiza la conversión de USD a moneda de destino con la última cotización (venta por defecto, o compra).
         """
@@ -474,9 +638,17 @@ class ServicioCotizacionDolar:
         valor = cotizacion.valor_venta if usar_venta else cotizacion.valor_compra
         return (Decimal(monto_usd) * valor).quantize(Decimal("0.01"))
 
-    def _validar_monedas(self, cotizacion: CotizacionDolar) -> None:
+    def _validar_referencias(self, cotizacion: CotizacionDolar) -> None:
+        if not self.repo_tipo_cotizacion.leer_por_id(cotizacion.tipo.id):
+            raise ServicioError(f"No existe el tipo de cotización con id {cotizacion.tipo.id}.")
         for moneda in (cotizacion.moneda_origen, cotizacion.moneda_destino):
             if not self.repo_moneda.leer_por_id(moneda.id):
                 raise ServicioError(f"No existe Moneda con id {moneda.id}.")
         if cotizacion.moneda_origen.id == cotizacion.moneda_destino.id:
             raise ServicioError("Moneda de origen y destino idénticas.")
+
+    def _nombre_tipo(self, tipo: Union[TipoCotizacion, int]) -> str:
+        if isinstance(tipo, TipoCotizacion):
+            return tipo.nombre
+        entidad = self.repo_tipo_cotizacion.leer_por_id(int(tipo))
+        return entidad.nombre if entidad else str(tipo)

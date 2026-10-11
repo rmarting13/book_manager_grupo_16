@@ -1,6 +1,6 @@
 import traceback
 
-from pydantic import AfterValidator, BaseModel, Field, field_validator, model_validator, EmailStr, HttpUrl, TypeAdapter
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator, EmailStr, HttpUrl, TypeAdapter
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -24,6 +24,7 @@ class ArchivoCsv(str, Enum):
     PRECIO = "precios.csv"
     STOCK = "stock.csv"
     COTIZACION = "cotizaciones.csv"
+    TIPO_COTIZACION = "tipo_cotizacion.csv"
 
 
 class GeneroLiterario(str, Enum):
@@ -49,24 +50,11 @@ class GeneroLiterario(str, Enum):
     OTRO = "Otro"
 
 
-class TipoCotizacion(str, Enum):
-    """
-    Tipos de cotización del dólar en Argentina:
-
-    Atrrs:
-        OFICIAL   : Cotización oficial publicada por el BCRA.
-        BLUE      : Cotización del mercado informal (dólar paralelo).
-        MEP       : Dólar bolsa / Mercado Electrónico de Pagos.
-    """
-
-    OFICIAL = "Oficial"
-    BLUE = "Blue"
-    MEP = "MEP"
-
-
 class EntidadBase(BaseModel):
     """Clase base de todas las entidades que proporciona un identificador único (Id).
        Hereda de BaseModel para proporcionar validaciones a las clases hijas."""
+
+    model_config = ConfigDict(validate_assignment=True)
 
     id: int = 0
 
@@ -109,8 +97,13 @@ class Moneda(EntidadBase):
         """Elimina espacios sobrantes de los campos de texto."""
         return input.strip()
 
-    def __str__(self) -> str:
+    @property
+    def descripcion_corta(self) -> str:
+        """Representación abreviada de la moneda."""
         return f"{self.simbolo} ({self.codigo})"
+
+    def __str__(self) -> str:
+        return self.descripcion_corta
 
 
 
@@ -249,9 +242,14 @@ class Libro(EntidadBase):
             raise ValueError(f"El campo '{info.field_name}' no puede estar vacío.")
         return input
 
+    @property
+    def descripcion_corta(self) -> str:
+        """Título junto al autor del libro."""
+        return f"'{self.titulo}' — {self.autor}"
+
     def __str__(self) -> str:
         return (
-            f"[{self.isbn}] '{self.titulo}' — {self.autor} "
+            f"[{self.isbn}] {self.descripcion_corta} "
             f"({self.editorial.nombre})"
         )
 
@@ -295,10 +293,15 @@ class Precio(EntidadBase):
         except Exception:
             raise ValueError(f"El valor del precio no es numérico: '{input}'")
 
+    @property
+    def valor_formateado(self) -> str:
+        """Valor del precio con símbolo de moneda y dos decimales."""
+        return f"{self.moneda.simbolo} {self.valor:,.2f}"
+
     def __str__(self) -> str:
         return (
             f"Precio | Libro: {self.libro} | "
-            f"{self.moneda.simbolo} {self.valor:,.2f} | "
+            f"{self.valor_formateado} | "
             f"Vigente desde: {self.fecha_vigencia}"
         )
 
@@ -347,12 +350,48 @@ class Stock(EntidadBase):
         )
 
 
+class TipoCotizacion(EntidadBase):
+    """
+    Tipo o mercado al que corresponde una cotización del dólar.
+
+    Attrs:
+        nombre      : Nombre del tipo de cotización (Oficial, Blue, MEP, ...).
+        descripcion : Descripción opcional del tipo de cotización.
+
+    Raises:
+        ValueError: Si ``nombre`` está vacío.
+    """
+
+    nombre: str
+    descripcion: Optional[str] = None
+
+    @field_validator("nombre")
+    @classmethod
+    def validar_nombre(cls, input: str) -> str:
+        """Normaliza y valida que el nombre no esté vacío."""
+        nombre = input.strip()
+        if not nombre:
+            raise ValueError("El nombre del tipo de cotización no puede estar vacío.")
+        return nombre
+
+    @field_validator("descripcion")
+    @classmethod
+    def normalizar_descripcion(cls, input: Optional[str]) -> Optional[str]:
+        """Elimina espacios sobrantes de la descripción."""
+        if input is None:
+            return None
+        return input.strip() or None
+
+    def __str__(self) -> str:
+        return self.nombre
+
+
 class CotizacionDolar(EntidadBase):
     """
     Registro histórico de la cotización de moneda por tipo y fecha.
 
     Attrs:
-        tipo           : Tipo de cotización (enum :class:`TipoCotizacion`).
+        tipo           : Instancia de :class:`TipoCotizacion`.
         moneda_origen  : Moneda de origen (usualmente USD).
         moneda_destino : Moneda de destino (usualmente ARS).
         valor_compra   : Precio de compra en ``moneda_destino`` por unidad de ``moneda_origen``.
@@ -388,11 +427,21 @@ class CotizacionDolar(EntidadBase):
         except Exception:
             raise ValueError(f"El valor de cotización no es numérico: '{input}'")
 
+    @property
+    def par_monedas(self) -> str:
+        """Par de monedas de la cotización (origen/destino)."""
+        return f"{self.moneda_origen.codigo}/{self.moneda_destino.codigo}"
+
+    @property
+    def spread(self) -> Decimal:
+        """Diferencia entre el valor de venta y el de compra."""
+        return self.valor_venta - self.valor_compra
+
     def __str__(self) -> str:
         return (
-            f"Cotización {self.tipo.value} "
+            f"Cotización {self.tipo.nombre} "
             f"[{self.fecha.strftime('%Y-%m-%d %H:%M')}] | "
-            f"{self.moneda_origen.codigo}/{self.moneda_destino.codigo} | "
+            f"{self.par_monedas} | "
             f"Compra: {self.valor_compra:,.2f} — "
             f"Venta: {self.valor_venta:,.2f} "
         )
@@ -513,11 +562,21 @@ if __name__ == '__main__':
     print(f"Necesita reposición: {stock_agotado.necesita_reposicion}")
 
 
+    # Tipos de cotización
+    PrinterUtil.dibujar_separador("7. Tipos de cotización")
+
+    tipo_oficial = TipoCotizacion(id=1, nombre="Oficial", descripcion="Cotización oficial del BCRA")
+    tipo_blue = TipoCotizacion(id=2, nombre="Blue", descripcion="Mercado informal")
+
+    print(tipo_oficial)
+    print(tipo_blue)
+
+
     # Cotizaciones
-    PrinterUtil.dibujar_separador("7. Cotizaciones")
+    PrinterUtil.dibujar_separador("8. Cotizaciones")
 
     cotizacion_blue = CotizacionDolar(
-        tipo=TipoCotizacion.BLUE,
+        tipo=tipo_blue,
         moneda_origen=usd,
         moneda_destino=ars,
         valor_compra= Decimal("1180"),
@@ -525,7 +584,7 @@ if __name__ == '__main__':
     )
 
     cotizacion_oficial = CotizacionDolar(
-        tipo=TipoCotizacion.OFICIAL,
+        tipo=tipo_oficial,
         moneda_origen=usd,
         moneda_destino=ars,
         valor_compra= Decimal("987"),
@@ -565,7 +624,7 @@ if __name__ == '__main__':
 
     # Cotización con venta < compra
     try:
-        CotizacionDolar(tipo=TipoCotizacion.MEP, moneda_origen=usd, moneda_destino=ars,
+        CotizacionDolar(tipo=tipo_oficial, moneda_origen=usd, moneda_destino=ars,
                 valor_compra= Decimal('1200'), valor_venta=Decimal("1100"))
     except ValidationError:
         traceback.print_exc()
@@ -576,3 +635,8 @@ if __name__ == '__main__':
     except ValidationError:
         traceback.print_exc()
 
+    # Tipo de cotización sin nombre
+    try:
+        TipoCotizacion(nombre="   ")
+    except ValidationError:
+        traceback.print_exc()

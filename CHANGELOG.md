@@ -1,3 +1,10 @@
+## [Correcciones]
+Se corrigieron las siguientes observaciones:
+- Encapsulamiento: EntidadBase ahora usa model_config = ConfigDict(validate_assignment=True), de modo que toda asignación a un atributo vuelve a pasar por las validaciones (semántica de setter). Se agregaron properties derivadas a las clases. Debido a restricciones de Pydantic no es posible declarar los atributos como privados. Las lases no Pydantic como repositorios, servicios y consola cuentan con atributos privados y @property de solo lectura.
+-  TipoCotizacion como entidad ya no es Enum, sino que es una clase con nombre y descripcion como atributos, se implementó RepositorioTipoCotizacion en repositories.py y CotizacionDolar.tipo es ahora una instancia de TipoCotizacion. Nuevo ServicioTipoCotizacion con CRUD en servicios.py.
+- Los archivos csv ahora se escriben correctamente en el directorio migration/csv/ y se agregó tipo_cotizacion.csv generado por preload_data.py.
+- Se agregaron Gestionar monedas y Gestionar tipos de cotización al menú del main para acceder sus CRUD correspondientes.
+
 ## [Ejercicio 07]
 - Implementación de lógica en archivo main.py para ejecutar el sistema de inventario.
 - Ajustes en modelos de entidades, repositorios y servicios.
