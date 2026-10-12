@@ -1,3 +1,8 @@
+## [Ejercicio 03]
+- Modificación de la clase ConexionDB para implementar un context manager para manejar las transacciones a la base de datos.
+- Pruebas unitarias
+- Actualización del CHANGELOG.md
+
 ## [Ejercicio 02]
 - Implementación de clase ConexionDB para gestionar la conexión usando SQLAlchemy.
 - Pruebas unitarias de querys SQL

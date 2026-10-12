@@ -1,6 +1,8 @@
 import os
+from contextlib import contextmanager
+from typing import Generator
 from sqlalchemy import create_engine
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.engine.row import Row
 from sqlalchemy.sql import text
 from book_manager.utilities.utilities import PrinterUtil
@@ -32,6 +34,32 @@ class ConexionDB:
         """Engine de SQLAlchemy asociado a la conexión."""
         return self._engine
 
+    @contextmanager
+    def transaccion(self) -> Generator[Connection, None, None]:
+        """Context manager que maneja una transacción sobre la base de datos.
+
+        Abre una conexión y una transacción, y entrega la conexión para
+        ejecutar sentencias dentro del bloque ``with``. Hace ``commit`` al
+        salir sin errores y ``rollback`` si se produce una excepción.
+
+        Yields:
+            Connection: Conexión con la transacción ya iniciada.
+
+        Raises:
+            Exception: La excepción original si falla alguna sentencia.
+        """
+        connection = self.engine.connect()
+        transaction = connection.begin()
+        try:
+            yield connection
+            transaction.commit()
+        except Exception:
+            transaction.rollback()
+            raise
+        finally:
+            transaction.close()
+            connection.close()
+
     def ejecutar_query(self, query: str) -> list[Row]:
         """Ejecuta una sentencia SQL dentro de una transacción.
 
@@ -48,19 +76,9 @@ class ConexionDB:
         Raises:
             Exception: La excepción original si la sentencia falla.
         """
-        connection = self.engine.connect()
-        transaction = connection.begin()
-        try:
+        with self.transaccion() as connection:
             resultado = connection.execute(text(query))
-            filas: list[Row] = list(resultado.fetchall()) if resultado.returns_rows else []
-            transaction.commit()
-            return filas
-        except Exception:
-            transaction.rollback()
-            raise
-        finally:
-            transaction.close()
-            connection.close()
+            return list(resultado.fetchall()) if resultado.returns_rows else []
 
     def cerrar(self) -> None:
         """Libera el pool de conexiones del engine."""
@@ -154,6 +172,55 @@ if __name__ == "__main__":
     assert total[0][0] == 3, f"El rollback no funcionó: hay {total[0][0]} filas"
     print("Rollback verificado: siguen habiendo 3 filas.")
 
-    PrinterUtil.dibujar_separador("5. Cierre de la conexión")
+    PrinterUtil.dibujar_separador("5. Context manager: commit")
+    with conexion.transaccion() as conn:
+        conn.execute(text("""
+            INSERT INTO libros (isbn, titulo, autor, editorial, genero, idioma,
+                                paginas, edicion, fecha_publicacion, peso)
+            values ('9780307476463', 'Pedro Páramo', 'Juan Rulfo', 'Planeta',
+                    'Novela', 'Español', 132, 1, '1955-03-01', 210);
+            """))
+        conn.execute(text("""
+            INSERT INTO libros (isbn, titulo, autor, editorial, genero, idioma,
+                                paginas, edicion, fecha_publicacion, peso)
+            values ('9788499924212', 'Sapiens', 'Yuval Noah Harari', 'Debolsillo',
+                    'Ensayo', 'Español', 496, 1, '2011-01-01', 530);
+            """))
+    total = conexion.ejecutar_query("SELECT COUNT(*) FROM libros;")
+    assert total[0][0] == 5, f"El commit no funcionó: hay {total[0][0]} filas"
+    print("Commit verificado: 5 filas.")
+
+    PrinterUtil.dibujar_separador("6. Context manager: rollback")
+    try:
+        with conexion.transaccion() as conn:
+            conn.execute(text("""
+                INSERT INTO libros (isbn, titulo, autor, editorial, genero, idioma,
+                                    paginas, edicion, fecha_publicacion, peso)
+                values ('9788433910868', 'Los detectives salvajes', 'Roberto Bolaño',
+                        'Anagrama', 'Novela', 'Español', 623, 1, '1998-11-01', 580);
+                """))
+            conn.execute(text("INSERT INTO tabla_inexistente (nombre) values ('Falla');"))
+    except Exception as error:
+        print(f"Error capturado: {type(error).__name__}")
+    total = conexion.ejecutar_query("SELECT COUNT(*) FROM libros;")
+    assert total[0][0] == 5, f"El rollback no funcionó: hay {total[0][0]} filas"
+    print("Rollback verificado: siguen habiendo 5 filas.")
+
+    PrinterUtil.dibujar_separador("7. Context manager: lectura")
+    with conexion.transaccion() as conn:
+        resultado = conn.execute(text("""
+            SELECT titulo, peso FROM libros WHERE peso > 500 ORDER BY peso;
+            """))
+        filas = list(resultado)
+        for fila in filas:
+            print(fila)
+        assert len(filas) == 2, f"Se esperaban 2 filas, se obtuvieron {len(filas)}"
+        assert filas[0].titulo == "Cien años de soledad"
+        assert filas[1].titulo == "Sapiens"
+    print("Lectura dentro del context manager verificada: 2 filas.")
+
+    PrinterUtil.dibujar_separador("8. Cierre de la conexión")
     conexion.cerrar()
     print("Conexión cerrada.")
+
+    PrinterUtil.dibujar_separador("TODAS LAS PRUEBAS PASARON")
