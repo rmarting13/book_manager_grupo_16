@@ -193,6 +193,8 @@ class Libro(EntidadBase):
         idioma           : Idioma del libro (por defecto ``'Español'``).
         paginas          : Número de páginas (opcional, debe ser > 0).
         edicion          : Número de edición (por defecto 1).
+        fecha_publicacion: Fecha de publicación del libro (opcional).
+        peso             : Peso del libro en gramos (opcional, debe ser > 0).
 
     Raises:
         ValidationError: Si el ISBN es inválido, el año está fuera de rango,
@@ -208,6 +210,8 @@ class Libro(EntidadBase):
     edicion: int = Field(default=1, ge=1)
     idioma: str = "Español"
     paginas: Optional[int] = Field(default=None, gt=0)
+    fecha_publicacion: Optional[date] = None
+    peso: Optional[int] = Field(default=None, gt=0)
 
     @field_validator("isbn")
     @classmethod
@@ -246,6 +250,13 @@ class Libro(EntidadBase):
     def descripcion_corta(self) -> str:
         """Título junto al autor del libro."""
         return f"'{self.titulo}' — {self.autor}"
+
+    @property
+    def peso_kg(self) -> Optional[Decimal]:
+        """Peso del libro expresado en kilogramos."""
+        if self.peso is None:
+            return None
+        return (Decimal(self.peso) / Decimal("1000")).quantize(Decimal("0.001"))
 
     def __str__(self) -> str:
         return (
@@ -494,6 +505,8 @@ if __name__ == '__main__':
         idioma="Español",
         paginas=224,
         edicion=3,
+        fecha_publicacion=date(1944, 6, 15),
+        peso=280,
     )
 
     cien_anios_de_soledad = Libro(
@@ -504,6 +517,8 @@ if __name__ == '__main__':
         genero=novela,
         idioma="Inglés",
         paginas=431,
+        fecha_publicacion=date(1967, 5, 30),
+        peso=520,
     )
 
     tasm_04_ca = Libro(
@@ -514,6 +529,8 @@ if __name__ == '__main__':
             genero=manga,
             idioma="Inglés",
             paginas=431,
+            fecha_publicacion=date(2021, 9, 14),
+            peso=610,
         )
 
     print(ficciones)

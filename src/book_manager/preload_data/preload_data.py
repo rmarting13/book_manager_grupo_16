@@ -92,16 +92,16 @@ def precargar_datos(ruta_csv: str) -> None:
     editoriales = [repo_editorial.crear(editorial) for editorial in editoriales]
 
     datos_libros = [
-        ('9788420633121',"Ficciones", "Jorge Luis Borges", 0, 0, 3, "Español", 224),
-        ('9788439732471',"Cien años de soledad", "Gabriel García Márquez", 1, 0, 1, "Español", 471),
-        ('978-84-20-41470-6',"Rayuela", "Julio Cortázar", 2, 0, 2, "Español", 736),
-        ('9788466301169',"La ciudad y los perros", "Mario Vargas Llosa", 3, 0, 1, "Español", 464),
-        ('9788433910868',"Los detectives salvajes", "Roberto Bolaño", 4, 0, 1, "Español", 623),
-        ('978-98-77-25411-2',"Dune", "Frank Herbert", 5, 5, 1, "Español", 784),
-        ('978-84-01-35279-9',"El nombre del viento", "Patrick Rothfuss", 8, 6, 1, "Español", 872),
-        ('9788499924212',"Sapiens", "Yuval Noah Harari", 7, 1, 1, "Español", 496),
-        ('9789504949930',"La tregua", "Mario Benedetti", 6, 0, 2, "Español", 240),
-        ('978-98-73-65038-3',"Maus", "Art Spiegelman", 9, 9, 1, "Español", 296)
+        ('9788420633121',"Ficciones", "Jorge Luis Borges", 0, 0, 3, "Español", 224, date(1944, 6, 15), 280),
+        ('9788439732471',"Cien años de soledad", "Gabriel García Márquez", 1, 0, 1, "Español", 471, date(1967, 5, 30), 520),
+        ('978-84-20-41470-6',"Rayuela", "Julio Cortázar", 2, 0, 2, "Español", 736, date(1963, 6, 28), 640),
+        ('9788466301169',"La ciudad y los perros", "Mario Vargas Llosa", 3, 0, 1, "Español", 464, date(1963, 10, 1), 410),
+        ('9788433910868',"Los detectives salvajes", "Roberto Bolaño", 4, 0, 1, "Español", 623, date(1998, 11, 1), 580),
+        ('978-98-77-25411-2',"Dune", "Frank Herbert", 5, 5, 1, "Español", 784, date(1965, 8, 1), 690),
+        ('978-84-01-35279-9',"El nombre del viento", "Patrick Rothfuss", 8, 6, 1, "Español", 872, date(2007, 3, 27), 750),
+        ('9788499924212',"Sapiens", "Yuval Noah Harari", 7, 1, 1, "Español", 496, date(2011, 1, 1), 530),
+        ('9789504949930',"La tregua", "Mario Benedetti", 6, 0, 2, "Español", 240, date(1960, 4, 1), 260),
+        ('978-98-73-65038-3',"Maus", "Art Spiegelman", 9, 9, 1, "Español", 296, date(1986, 8, 12), 470)
     ]
 
     libros: List[Libro] = []
@@ -114,7 +114,9 @@ def precargar_datos(ruta_csv: str) -> None:
             genero=generos[reg[4]],
             edicion=reg[5],
             idioma=reg[6],
-            paginas=reg[7]
+            paginas=reg[7],
+            fecha_publicacion=reg[8],
+            peso=reg[9]
         )
         libros.append(repo_libro.crear(libro))
 

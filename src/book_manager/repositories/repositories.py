@@ -478,9 +478,10 @@ class RepositorioLibro(RepositorioCSV[Libro]):
             "editorial_id",
             "genero_id",
             "edicion",
-            "anio_publicacion",
             "idioma",
             "paginas",
+            "fecha_publicacion",
+            "peso",
         ]
 
     def _a_fila(self, entidad: Libro) -> Dict[str, str]:
@@ -495,6 +496,8 @@ class RepositorioLibro(RepositorioCSV[Libro]):
             "edicion": str(entidad.edicion),
             "idioma": entidad.idioma,
             "paginas": "" if entidad.paginas is None else str(entidad.paginas),
+            "fecha_publicacion": entidad.fecha_publicacion.isoformat() if entidad.fecha_publicacion else "",
+            "peso": "" if entidad.peso is None else str(entidad.peso),
         }
 
     def _desde_fila(self, fila: Dict[str, str]) -> Libro:
@@ -513,6 +516,8 @@ class RepositorioLibro(RepositorioCSV[Libro]):
             edicion=int(fila["edicion"]),
             idioma=fila["idioma"],
             paginas=int(fila["paginas"]) if fila["paginas"] else None,
+            fecha_publicacion=date.fromisoformat(fila["fecha_publicacion"]) if fila["fecha_publicacion"] else None,
+            peso=int(fila["peso"]) if fila["peso"] else None,
         )
 
 

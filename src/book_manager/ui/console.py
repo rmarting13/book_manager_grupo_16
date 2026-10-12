@@ -132,6 +132,19 @@ def pedir_fecha(mensaje: str, actual: date) -> date:
             print("Ingrese una fecha válida con formato AAAA-MM-DD.")
 
 
+def pedir_fecha_opcional(mensaje: str, actual: Optional[date] = None) -> Optional[date]:
+    """Solicita una fecha opcional AAAA-MM-DD. El vacío conserva la actual o None."""
+    sufijo = f" [{actual.isoformat()}]" if actual else " (opcional)"
+    while True:
+        valor = input(f"  {mensaje}{sufijo}: ").strip()
+        if not valor:
+            return actual
+        try:
+            return date.fromisoformat(valor)
+        except ValueError:
+            print("Ingrese una fecha válida con formato AAAA-MM-DD.")
+
+
 def confirmar(mensaje: str) -> bool:
     while True:
         r = input(f"  {mensaje} (s/n): ").strip().lower()
@@ -400,9 +413,12 @@ class ConsolaInventario:
         edicion = pedir_entero("Edición", minimo=1)
         idioma = editar_texto("Idioma", "Español")
         paginas = pedir_entero_opcional("Páginas")
+        fecha_publicacion = pedir_fecha_opcional("Fecha de publicación")
+        peso = pedir_entero_opcional("Peso en gramos")
         libro = Libro(
             isbn=isbn, titulo=titulo, autor=autor, editorial=editorial, genero=genero,
             edicion=edicion, idioma=idioma, paginas=paginas,
+            fecha_publicacion=fecha_publicacion, peso=peso,
         )
         precio = pedir_decimal("Precio")
         cantidad = pedir_entero("Stock", minimo=0)
@@ -421,6 +437,8 @@ class ConsolaInventario:
         print(f"ID: {l.id}\n  ISBN: {l.isbn}\n  Título: {l.titulo}\n  Autor: {l.autor}\n"
               f"Editorial: {l.editorial.nombre}\n  Género: {l.genero.nombre}\n"
               f"Edición: {l.edicion}\n  Idioma: {l.idioma}\n  Páginas: {l.paginas or '-'}\n"
+              f"Fecha de publicación: {l.fecha_publicacion.isoformat() if l.fecha_publicacion else '-'}\n"
+              f"Peso: {str(l.peso) + ' g' if l.peso else '-'}\n"
               f"Precio: {self._texto_precio(precio)}\n"
               f"Stock: {stock.cantidad if stock else '-'}")
 
@@ -441,9 +459,12 @@ class ConsolaInventario:
         edicion = editar_entero("Edición", actual.edicion, minimo=1)
         idioma = editar_texto("Idioma", actual.idioma)
         paginas = pedir_entero_opcional("Páginas", actual.paginas)
+        fecha_publicacion = pedir_fecha_opcional("Fecha de publicación", actual.fecha_publicacion)
+        peso = pedir_entero_opcional("Peso en gramos", actual.peso)
         libro = Libro(
             id=actual.id, isbn=isbn, titulo=titulo, autor=autor, editorial=editorial,
             genero=genero, edicion=edicion, idioma=idioma, paginas=paginas,
+            fecha_publicacion=fecha_publicacion, peso=peso,
         )
         precio_actual = self._precios.obtener_vigente(actual.id, self._moneda_base().id)
         precio = editar_decimal("Precio", precio_actual.valor if precio_actual else None)
