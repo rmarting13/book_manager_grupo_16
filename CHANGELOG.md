@@ -1,3 +1,9 @@
+## [Ejercicio 04]
+- Implementación de lógica en models.py para crear las tablas del sistema con sus tipos de datos y relaciones. Se utilizó la librería sqlalchemy para importar tipos de datos y funciones del módulo ORM para mapear los modelos.
+- Modificación de la clase ConexionDB para adaptar el uso de los modelos definidos en models.py. Se reemplazó la conexión SQLite por PosgreSQL para conectar con Supabase.
+- Pruebas unitarias
+- Actualización del CHANGELOG.md
+
 ## [Ejercicio 03]
 - Modificación de la clase ConexionDB para implementar un context manager para manejar las transacciones a la base de datos.
 - Pruebas unitarias
