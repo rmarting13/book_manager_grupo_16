@@ -1,0 +1,13 @@
+-- Migración de datos: tabla libros
+-- Generado automáticamente por migrations.py
+
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (1, '9788420633121', 'Ficciones', 'Jorge Luis Borges', 1, 1, 3, 'Español', 224, '1944-06-15', 280);
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (2, '9788439732471', 'Cien años de soledad', 'Gabriel García Márquez', 2, 1, 1, 'Español', 471, '1967-05-30', 520);
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (3, '9788420414706', 'Rayuela', 'Julio Cortázar', 3, 1, 2, 'Español', 736, '1963-06-28', 640);
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (4, '9788466301169', 'La ciudad y los perros', 'Mario Vargas Llosa', 4, 1, 1, 'Español', 464, '1963-10-01', 410);
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (5, '9788433910868', 'Los detectives salvajes', 'Roberto Bolaño', 5, 1, 1, 'Español', 623, '1998-11-01', 580);
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (6, '9789877254112', 'Dune', 'Frank Herbert', 6, 6, 1, 'Español', 784, '1965-08-01', 690);
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (7, '9788401352799', 'El nombre del viento', 'Patrick Rothfuss', 9, 7, 1, 'Español', 872, '2007-03-27', 750);
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (8, '9788499924212', 'Sapiens', 'Yuval Noah Harari', 8, 2, 1, 'Español', 496, '2011-01-01', 530);
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (9, '9789504949930', 'La tregua', 'Mario Benedetti', 7, 1, 2, 'Español', 240, '1960-04-01', 260);
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (10, '9789873650383', 'Maus', 'Art Spiegelman', 10, 10, 1, 'Español', 296, '1986-08-12', 470);

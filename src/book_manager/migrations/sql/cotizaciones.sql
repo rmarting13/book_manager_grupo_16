@@ -1,0 +1,13 @@
+-- Migración de datos: tabla cotizaciones
+-- Generado automáticamente por migrations.py
+
+INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (1, 1, 2, 1, 1120, 1160, '2026-10-11T12:00:00');
+INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (2, 2, 2, 1, 1280, 1315, '2026-10-11T12:00:00');
+INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (3, 3, 2, 1, 1230, 1258, '2026-10-11T12:00:00');
+INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (4, 1, 2, 1, 1110, 1148, '2026-10-10T12:00:00');
+INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (5, 2, 2, 1, 1265, 1298, '2026-10-10T12:00:00');
+INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (6, 3, 2, 1, 1218, 1240, '2026-10-10T12:00:00');
+INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (7, 1, 2, 1, 1102, 1139, '2026-10-09T12:00:00');
+INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (8, 2, 2, 1, 1257, 1290, '2026-10-09T12:00:00');
+INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (9, 3, 2, 1, 1204, 1232, '2026-10-09T12:00:00');
+INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (10, 1, 2, 1, 1096, 1130, '2026-10-08T12:00:00');

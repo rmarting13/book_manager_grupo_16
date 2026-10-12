@@ -1,0 +1,11 @@
+id,tipo,nombre_personalizado,descripcion
+1,Novela,,Narrativa de ficción de extensión media o larga.
+2,Ensayo,,Obras de análisis y reflexión.
+3,Poesía,,Composición literaria en verso o prosa poética.
+4,Teatro,,Textos dramáticos para representación escénica.
+5,Infantil,,Literatura orientada a lectores niños y niñas.
+6,Ciencia Ficción,,Relatos de ciencia y futuros posibles.
+7,Fantasía,,Mundos y elementos imaginarios.
+8,Biografía,,Relatos de vida de personas reales.
+9,Historia,,Obras sobre procesos y hechos históricos.
+10,Otro,Novela gráfica,Historias narradas con fuerte componente visual.

@@ -1,0 +1,11 @@
+id,nombre,descripcion
+1,Oficial,Cotización oficial publicada por el BCRA.
+2,Blue,Cotización del mercado informal (dólar paralelo).
+3,MEP,Dólar bolsa / Mercado Electrónico de Pagos.
+4,CCL,Contado con Liquidación.
+5,Tarjeta,Dólar para consumos con tarjeta en el exterior.
+6,Mayorista,Cotización mayorista del mercado cambiario.
+7,Cripto,Cotización del dólar en el mercado cripto.
+8,Solidario,Dólar ahorro con recargo solidario.
+9,Qatar,Cotización para consumos en el exterior.
+10,Turista,Cotización para gastos de turismo en el exterior.

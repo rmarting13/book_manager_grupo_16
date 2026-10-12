@@ -1,0 +1,13 @@
+-- Migración de datos: tabla generos
+-- Generado automáticamente por migrations.py
+
+INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (1, 'Novela', NULL, 'Narrativa de ficción de extensión media o larga.');
+INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (2, 'Ensayo', NULL, 'Obras de análisis y reflexión.');
+INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (3, 'Poesía', NULL, 'Composición literaria en verso o prosa poética.');
+INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (4, 'Teatro', NULL, 'Textos dramáticos para representación escénica.');
+INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (5, 'Infantil', NULL, 'Literatura orientada a lectores niños y niñas.');
+INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (6, 'Ciencia Ficción', NULL, 'Relatos de ciencia y futuros posibles.');
+INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (7, 'Fantasía', NULL, 'Mundos y elementos imaginarios.');
+INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (8, 'Biografía', NULL, 'Relatos de vida de personas reales.');
+INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (9, 'Historia', NULL, 'Obras sobre procesos y hechos históricos.');
+INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (10, 'Otro', 'Novela gráfica', 'Historias narradas con fuerte componente visual.');

@@ -1,0 +1,13 @@
+-- Migración de datos: tabla precios
+-- Generado automáticamente por migrations.py
+
+INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (1, 1, 1, 12500, '2026-10-11');
+INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (2, 2, 1, 14200, '2026-10-10');
+INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (3, 3, 1, 15900, '2026-10-09');
+INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (4, 4, 1, 17600, '2026-10-08');
+INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (5, 5, 1, 19300, '2026-10-07');
+INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (6, 6, 1, 21000, '2026-10-06');
+INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (7, 7, 1, 22700, '2026-10-05');
+INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (8, 8, 2, 24400, '2026-10-04');
+INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (9, 9, 2, 26100, '2026-10-03');
+INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (10, 10, 2, 27800, '2026-10-02');

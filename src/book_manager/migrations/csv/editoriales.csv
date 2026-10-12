@@ -1,0 +1,11 @@
+id,nombre,pais_origen,email,telefono,sitio_web
+1,Planeta,Argentina,contacto@planeta.com.ar,,https://www.planetadelibros.com.ar/
+2,Sudamericana,Argentina,info@sudamericana.com.ar,,https://www.megustaleer.com.ar/
+3,Alfaguara,España,atencion@alfaguara.com,,https://www.penguinlibros.com/
+4,Anagrama,España,info@anagrama-ed.es,,https://www.anagrama-ed.es/
+5,Tusquets,España,contacto@tusquetseditores.com,,https://www.tusquetseditores.com/
+6,Seix Barral,España,consultas@seix-barral.es,,https://www.planetadelibros.com/
+7,Eterna Cadencia,Argentina,editorial@eternacadencia.com.ar,,https://eternacadencia.com.ar/
+8,Siglo XXI,México,ventas@sigloxxieditores.com,,https://www.sigloxxieditores.com/
+9,Debolsillo,España,hola@debolsillo.com,,https://www.penguinlibros.com/
+10,Paidós,Argentina,info@paidos.com.ar,,https://www.planetadelibros.com.ar/
