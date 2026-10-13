@@ -1,7 +1,10 @@
-from datetime import date
+from datetime import date, datetime, time
 from decimal import Decimal
-from typing import List, Optional, Union
-
+from typing import Any, Dict, List, Optional, Union
+import json
+import os
+import urllib.error
+import urllib.request
 from book_manager.entities.entities import (
     CotizacionDolar,
     Editorial,
@@ -27,6 +30,17 @@ from book_manager.repositories.repositories import (
 class ServicioError(ValueError):
     """Clase de error base para validaciones."""
     pass
+
+
+NOMBRES_API_A_TIPO: Dict[str, str] = {
+    "oficial": "Oficial",
+    "blue": "Blue",
+    "bolsa": "MEP",
+    "contadoconliqui": "CCL",
+    "tarjeta": "Tarjeta",
+    "mayorista": "Mayorista",
+    "cripto": "Cripto",
+}
 
 
 class MonedaServicio:
@@ -638,6 +652,121 @@ class ServicioCotizacionDolar:
         valor = cotizacion.valor_venta if usar_venta else cotizacion.valor_compra
         return (Decimal(monto_usd) * valor).quantize(Decimal("0.01"))
 
+    def obtener_cotizaciones(self, url: Optional[str] = None) -> List[CotizacionDolar]:
+        """Busca, descarga y registra las cotizaciones publicadas por la API.
+
+        Consume la API indicada en ``API_URL`` (o la ``url`` recibida), traduce
+        cada cotización publicada al tipo de cotización equivalente y registra una
+        cotización por día y tipo, actualizándola si ya existía.
+
+        Args:
+            url: URL del servicio a consumir. Si se omite, se toma de ``API_URL``.
+
+        Returns:
+            List[CotizacionDolar]: Las cotizaciones registradas o actualizadas.
+
+        Raises:
+            ServicioError: Si falta la URL, falla la descarga o la respuesta no es válida.
+        """
+        source = url or os.getenv("API_URL")
+        if not source:
+            raise ServicioError("No se definió la variable API_URL en el entorno.")
+
+        moneda_origen = self._moneda_por_codigo("USD")
+        moneda_destino = self._moneda_por_codigo("ARS")
+
+        registradas: List[CotizacionDolar] = []
+        for dato in self._descargar_cotizaciones(source):
+            tipo = self._tipo_desde_api(dato)
+            if tipo is None:
+                continue
+            fecha = self._fecha_desde_api(dato)
+            valores = self._valores_desde_api(dato)
+            cotizacion = CotizacionDolar(
+                tipo=tipo,
+                moneda_origen=moneda_origen,
+                moneda_destino=moneda_destino,
+                valor_compra=valores[0],
+                valor_venta=valores[1],
+                fecha=fecha,
+            )
+            registradas.append(self._registrar_cotizacion(cotizacion))
+        return registradas
+
+    def _registrar_cotizacion(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
+        """Registra la cotización del día, actualizándola si ya existía."""
+        existente = self.repo_cotizacion.leer_por_tipo_y_fecha(
+            cotizacion.tipo, cotizacion.fecha.date()
+        )
+        if existente is None:
+            return self.crear(cotizacion)
+        cotizacion.id = existente.id
+        return self.actualizar(cotizacion)
+
+    def _descargar_cotizaciones(self, url: str) -> List[Dict[str, Any]]:
+        """Descarga y decodifica el listado de cotizaciones publicado por la API."""
+        peticion = urllib.request.Request(url, headers={"User-Agent": "book-manager-grupo-16"})
+        try:
+            with urllib.request.urlopen(peticion, timeout=30) as respuesta:
+                contenido = respuesta.read().decode("utf-8")
+        except urllib.error.URLError as error:
+            raise ServicioError(f"No se pudo consultar la API de cotizaciones: {error}") from error
+        except UnicodeDecodeError as error:
+            raise ServicioError(f"La respuesta de la API no está en UTF-8: {error}") from error
+
+        try:
+            datos = json.loads(contenido)
+        except json.JSONDecodeError as error:
+            raise ServicioError(f"La API devolvió una respuesta que no es JSON: {error}") from error
+
+        if not isinstance(datos, list):
+            raise ServicioError("La API devolvió un formato inesperado: se esperaba una lista.")
+        return datos
+
+    def _tipo_desde_api(self, dato: Dict[str, Any]) -> Optional[TipoCotizacion]:
+        """Traduce la casa publicada por la API al tipo de cotización registrado."""
+        casa = str(dato.get("casa", "")).strip().lower()
+        nombre = NOMBRES_API_A_TIPO.get(casa, str(dato.get("nombre", "")).strip())
+        if not nombre:
+            return None
+        return next(
+            (t for t in self.repo_tipo_cotizacion.leer_todos() if t.nombre.lower() == nombre.lower()),
+            None,
+        )
+
+    @staticmethod
+    def _fecha_desde_api(dato: Dict[str, Any]) -> datetime:
+        """Normaliza la fecha de actualización publicada por la API."""
+        cruda = str(dato.get("fechaActualizacion", "")).strip()
+        if not cruda:
+            return datetime.combine(date.today(), time(12, 0))
+        try:
+            return datetime.fromisoformat(cruda.replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError as error:
+            raise ServicioError(f"Fecha de cotización inválida: '{cruda}'.") from error
+
+    @staticmethod
+    def _valores_desde_api(dato: Dict[str, Any]) -> tuple[Decimal, Decimal]:
+        """Extrae y valida los valores de compra y venta publicados por la API."""
+        try:
+            compra = Decimal(str(dato["compra"]))
+            venta = Decimal(str(dato["venta"]))
+        except (KeyError, ArithmeticError) as error:
+            raise ServicioError(f"Cotización incompleta recibida de la API: {dato}") from error
+        if compra <= 0 or venta <= 0:
+            raise ServicioError(f"La API devolvió valores no positivos: compra {compra}, venta {venta}.")
+        return (compra, venta)
+
+    def _moneda_por_codigo(self, codigo: str) -> Moneda:
+        """Recupera una moneda por su código ISO."""
+        moneda = next(
+            (m for m in self.repo_moneda.leer_todos() if m.codigo.upper() == codigo.upper()),
+            None,
+        )
+        if moneda is None:
+            raise ServicioError(f"No existe la moneda '{codigo}' para registrar la cotización.")
+        return moneda
+
     def _validar_referencias(self, cotizacion: CotizacionDolar) -> None:
         if not self.repo_tipo_cotizacion.leer_por_id(cotizacion.tipo.id):
             raise ServicioError(f"No existe el tipo de cotización con id {cotizacion.tipo.id}.")
@@ -652,3 +781,44 @@ class ServicioCotizacionDolar:
             return tipo.nombre
         entidad = self.repo_tipo_cotizacion.leer_por_id(int(tipo))
         return entidad.nombre if entidad else str(tipo)
+
+
+if __name__ == "__main__":
+    import os
+
+    from dotenv import load_dotenv
+
+    from book_manager.database.connection import ConexionDB
+    from book_manager.utilities.utilities import PrinterUtil
+
+    load_dotenv()
+
+    ruta = os.getenv("SQLALCHEMY_DATABASE_URL", "")
+    password = os.getenv("SUPABASE_DB_PASSWORD", "")
+    conexion = ConexionDB(ruta.replace("[YOUR-PASSWORD]", password))
+
+    servicio = ServicioCotizacionDolar(
+        RepositorioCotizacionDolar(conexion),
+        RepositorioMoneda(conexion),
+        RepositorioTipoCotizacion(conexion),
+    )
+
+    PrinterUtil.dibujar_separador("Cotizaciones descargadas de la API")
+    cotizaciones = servicio.obtener_cotizaciones()
+    PrinterUtil.imprimir_tabla(
+        ["ID", "Tipo", "Par", "Compra", "Venta", "Fecha"],
+        [
+            [
+                str(c.id),
+                c.tipo.nombre,
+                c.par_monedas,
+                f"{c.valor_compra:,.2f}",
+                f"{c.valor_venta:,.2f}",
+                c.fecha.strftime("%Y-%m-%d %H:%M"),
+            ]
+            for c in cotizaciones
+        ],
+    )
+    print(f"Total de cotizaciones registradas: {len(cotizaciones)}")
+
+    conexion.cerrar()

@@ -1,3 +1,8 @@
+## [Ejercicio 07]
+- Modificación del servicio ServicioCotizacionDolar en services.py para obtener las cotizaciones desde la API dolarapi. 
+- Pruebas unitarias del consumo de la API desde el servicio ServicioCotizacionDolar.
+- Actualización del CHANGELOG.md
+
 ## [Ejercicio 06]
 - Implementación de modificaciones en repositories.py para que el sistema utilice la base de datos y desestime la persistencia de datos mediante archivos locales. 
 - Pruebas unitarias.
