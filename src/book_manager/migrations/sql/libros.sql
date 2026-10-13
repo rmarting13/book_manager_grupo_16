@@ -1,6 +1,3 @@
--- Migración de datos: tabla libros
--- Generado automáticamente por migrations.py
-
 INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (1, '9788420633121', 'Ficciones', 'Jorge Luis Borges', 1, 1, 3, 'Español', 224, '1944-06-15', 280);
 INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (2, '9788439732471', 'Cien años de soledad', 'Gabriel García Márquez', 2, 1, 1, 'Español', 471, '1967-05-30', 520);
 INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id, edicion, idioma, paginas, fecha_publicacion, peso) VALUES (3, '9788420414706', 'Rayuela', 'Julio Cortázar', 3, 1, 2, 'Español', 736, '1963-06-28', 640);

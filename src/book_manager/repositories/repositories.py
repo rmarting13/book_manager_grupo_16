@@ -1,10 +1,9 @@
 import abc
-import csv
-import os
 from datetime import date, datetime
-from decimal import Decimal
-from typing import Dict, Generic, List, Optional, Type, TypeVar, Union
-
+from typing import Any, Generic, List, Optional, Type, TypeVar, Union
+from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
+from book_manager.database.connection import ConexionDB
 from book_manager.entities.entities import (
     CotizacionDolar,
     Editorial,
@@ -17,31 +16,43 @@ from book_manager.entities.entities import (
     Stock,
     TipoCotizacion,
 )
+from book_manager.models.models import (
+    CotizacionDolar as CotizacionDolarORM,
+    Editorial as EditorialORM,
+    Genero as GeneroORM,
+    Libro as LibroORM,
+    Moneda as MonedaORM,
+    Precio as PrecioORM,
+    Stock as StockORM,
+    TipoCotizacion as TipoCotizacionORM,
+)
+
+# import csv
+# import os
+# from decimal import Decimal
+# from typing import Dict
 
 T = TypeVar('T', bound=EntidadBase)
 
-
-def _asegurar_csv(ruta: str, columnas: List[str]) -> None:
-    """Crea el directorio y el CSV con encabezado si todavía no existe."""
-    os.makedirs(os.path.dirname(ruta) or ".", exist_ok=True)
-    if not os.path.exists(ruta):
-        _escribir_csv(ruta, columnas, [])
-
-
-def _leer_csv(ruta: str) -> List[Dict[str, str]]:
-    """Lee un CSV y devuelve sus filas como diccionarios."""
-    with open(ruta, "r", encoding="utf-8", newline="") as archivo:
-        return list(csv.DictReader(archivo))
-
-
-def _escribir_csv(ruta: str, columnas: List[str], filas: List[Dict[str, str]]) -> None:
-    """Reemplaza el contenido de un CSV con las filas indicadas."""
-    with open(ruta, "w", encoding="utf-8", newline="") as archivo:
-        escritor = csv.DictWriter(archivo, fieldnames=columnas)
-        escritor.writeheader()
-        escritor.writerows(filas)
-
-
+# def _asegurar_csv(ruta: str, columnas: List[str]) -> None:
+#     """Crea el directorio y el CSV con encabezado si todavía no existe."""
+#     os.makedirs(os.path.dirname(ruta) or ".", exist_ok=True)
+#     if not os.path.exists(ruta):
+#         _escribir_csv(ruta, columnas, [])
+#
+#
+# def _leer_csv(ruta: str) -> List[Dict[str, str]]:
+#     """Lee un CSV y devuelve sus filas como diccionarios."""
+#     with open(ruta, "r", encoding="utf-8", newline="") as archivo:
+#         return list(csv.DictReader(archivo))
+#
+#
+# def _escribir_csv(ruta: str, columnas: List[str], filas: List[Dict[str, str]]) -> None:
+#     """Reemplaza el contenido de un CSV con las filas indicadas."""
+#     with open(ruta, "w", encoding="utf-8", newline="") as archivo:
+#         escritor = csv.DictWriter(archivo, fieldnames=columnas)
+#         escritor.writeheader()
+#         escritor.writerows(filas)
 
 class IRepositorio(abc.ABC, Generic[T]):
   """Interfaz para repositorios que manejan entidades con operaciones CRUD básicas."""
@@ -114,7 +125,7 @@ class IRepositorioStock(abc.ABC):
   """Interfaz para repositorios del tipo Stock."""
 
   @abc.abstractmethod
-  def crear(self, stock: Stock) -> Stock:
+  def crear(self, entidad: Stock) -> Stock:
     """Crea un nuevo registro de stock.
 
     Args:
@@ -150,7 +161,7 @@ class IRepositorioStock(abc.ABC):
     pass
 
   @abc.abstractmethod
-  def actualizar(self, stock: 'Stock') -> 'Stock':
+  def actualizar(self, entidad: 'Stock') -> 'Stock':
     """Actualiza un registro de stock existente.
 
     Args:
@@ -165,7 +176,7 @@ class IRepositorioStock(abc.ABC):
     pass
 
   @abc.abstractmethod
-  def eliminar(self, libro_id: int) -> bool:
+  def eliminar(self, id: int) -> bool:
     """Elimina un registro de stock por ID de libro.
 
     Args:
@@ -181,7 +192,7 @@ class IRepositorioCotizacionDolar(abc.ABC):
   """Interfaz para repositorios del tipo RepositorioCotizacionDolar."""
 
   @abc.abstractmethod
-  def crear(self, cotizacion: 'CotizacionDolar') -> 'CotizacionDolar':
+  def crear(self, entidad: 'CotizacionDolar') -> 'CotizacionDolar':
     """Crea una nueva cotización de dólar.
 
     Args:
@@ -221,7 +232,7 @@ class IRepositorioCotizacionDolar(abc.ABC):
     pass
 
   @abc.abstractmethod
-  def actualizar(self, cotizacion: 'CotizacionDolar') -> 'CotizacionDolar':
+  def actualizar(self, entidad: 'CotizacionDolar') -> 'CotizacionDolar':
     """Actualiza una cotización de dólar existente.
 
     Args:
@@ -233,7 +244,7 @@ class IRepositorioCotizacionDolar(abc.ABC):
     pass
 
   @abc.abstractmethod
-  def eliminar(self, tipo_id: int, fecha: date) -> bool:
+  def eliminar(self, id: int, fecha: date) -> bool:
     """Elimina una cotización de dólar por tipo y fecha.
 
     Args:
@@ -246,535 +257,452 @@ class IRepositorioCotizacionDolar(abc.ABC):
     pass
 
 class RepositorioError(ValueError):
-        """
-            Clase de error a nivel de persistencia de datos.
-        """
+    """Clase de error a nivel de persistencia de datos."""
+    
+def _moneda_a_entidad(registro: MonedaORM) -> Moneda:
+    """Convierte un registro ORM de moneda en su entidad."""
+    return Moneda(
+        id=registro.id,
+        codigo=registro.codigo,
+        nombre=registro.nombre,
+        simbolo=registro.simbolo,
+    )
 
-class RepositorioCSV(IRepositorio[T], Generic[T]):
-    """Repositorio base para entidades persistidas en formato CSV."""
+def _moneda_a_modelo(entidad: Moneda) -> MonedaORM:
+    """Convierte una entidad de moneda en su registro ORM."""
+    return MonedaORM(
+        codigo=entidad.codigo,
+        nombre=entidad.nombre,
+        simbolo=entidad.simbolo,
+    )
 
-    def __init__(self, ruta_archivo: str, entidad_cls: Type[T]) -> None:
-        """Inicializa el repositorio con su ruta y clase de entidad."""
-        self._ruta_archivo = ruta_archivo
+def _genero_a_entidad(registro: GeneroORM) -> Genero:
+    """Convierte un registro ORM de género en su entidad."""
+    return Genero(
+        id=registro.id,
+        tipo=GeneroLiterario(registro.tipo),
+        nombre_personalizado=registro.nombre_personalizado,
+        descripcion=registro.descripcion,
+    )
+
+def _genero_a_modelo(entidad: Genero) -> GeneroORM:
+    """Convierte una entidad de género en su registro ORM."""
+    return GeneroORM(
+        tipo=entidad.tipo.value,
+        nombre_personalizado=entidad.nombre_personalizado,
+        descripcion=entidad.descripcion,
+    )
+
+def _editorial_a_entidad(registro: EditorialORM) -> Editorial:
+    """Convierte un registro ORM de editorial en su entidad."""
+    return Editorial(
+        id=registro.id,
+        nombre=registro.nombre,
+        pais_origen=registro.pais_origen,
+        email=registro.email,
+        telefono=registro.telefono,
+        sitio_web=registro.sitio_web,
+    )
+
+def _editorial_a_modelo(entidad: Editorial) -> EditorialORM:
+    """Convierte una entidad de editorial en su registro ORM."""
+    return EditorialORM(
+        nombre=entidad.nombre,
+        pais_origen=entidad.pais_origen,
+        email=str(entidad.email) if entidad.email else None,
+        telefono=entidad.telefono,
+        sitio_web=str(entidad.sitio_web) if entidad.sitio_web else None,
+    )
+
+def _libro_a_entidad(registro: LibroORM) -> Libro:
+    """Convierte un registro ORM de libro en su entidad."""
+    return Libro(
+        id=registro.id,
+        isbn=registro.isbn,
+        titulo=registro.titulo,
+        autor=registro.autor,
+        editorial=_editorial_a_entidad(registro.editorial),
+        genero=_genero_a_entidad(registro.genero),
+        edicion=registro.edicion,
+        idioma=registro.idioma,
+        paginas=registro.paginas,
+        fecha_publicacion=registro.fecha_publicacion,
+        peso=registro.peso,
+    )
+
+def _libro_a_modelo(entidad: Libro) -> LibroORM:
+    """Convierte una entidad de libro en su registro ORM."""
+    return LibroORM(
+        isbn=entidad.isbn,
+        titulo=entidad.titulo,
+        autor=entidad.autor,
+        editorial_id=entidad.editorial.id,
+        genero_id=entidad.genero.id,
+        edicion=entidad.edicion,
+        idioma=entidad.idioma,
+        paginas=entidad.paginas,
+        fecha_publicacion=entidad.fecha_publicacion,
+        peso=entidad.peso,
+    )
+
+def _precio_a_entidad(registro: PrecioORM) -> Precio:
+    """Convierte un registro ORM de precio en su entidad."""
+    return Precio(
+        id=registro.id,
+        libro=_libro_a_entidad(registro.libro),
+        moneda=_moneda_a_entidad(registro.moneda),
+        valor=registro.valor,
+        fecha_vigencia=registro.fecha_vigencia,
+    )
+
+def _precio_a_modelo(entidad: Precio) -> PrecioORM:
+    """Convierte una entidad de precio en su registro ORM."""
+    return PrecioORM(
+        libro_id=entidad.libro.id,
+        moneda_id=entidad.moneda.id,
+        valor=entidad.valor,
+        fecha_vigencia=entidad.fecha_vigencia,
+    )
+
+def _stock_a_entidad(registro: StockORM) -> Stock:
+    """Convierte un registro ORM de stock en su entidad."""
+    return Stock(
+        id=registro.id,
+        libro=_libro_a_entidad(registro.libro),
+        cantidad=registro.cantidad,
+        stock_minimo=registro.stock_minimo,
+        fecha_ultimo_ingreso=registro.fecha_ultimo_ingreso,
+    )
+
+def _stock_a_modelo(entidad: Stock) -> StockORM:
+    """Convierte una entidad de stock en su registro ORM."""
+    return StockORM(
+        libro_id=entidad.libro.id,
+        cantidad=entidad.cantidad,
+        stock_minimo=entidad.stock_minimo,
+        fecha_ultimo_ingreso=entidad.fecha_ultimo_ingreso,
+    )
+
+def _tipo_cotizacion_a_entidad(registro: TipoCotizacionORM) -> TipoCotizacion:
+    """Convierte un registro ORM de tipo de cotización en su entidad."""
+    return TipoCotizacion(
+        id=registro.id,
+        nombre=registro.nombre,
+        descripcion=registro.descripcion,
+    )
+
+def _tipo_cotizacion_a_modelo(entidad: TipoCotizacion) -> TipoCotizacionORM:
+    """Convierte una entidad de tipo de cotización en su registro ORM."""
+    return TipoCotizacionORM(
+        nombre=entidad.nombre,
+        descripcion=entidad.descripcion,
+    )
+
+def _cotizacion_a_entidad(registro: CotizacionDolarORM) -> CotizacionDolar:
+    """Convierte un registro ORM de cotización en su entidad."""
+    return CotizacionDolar(
+        id=registro.id,
+        tipo=_tipo_cotizacion_a_entidad(registro.tipo),
+        moneda_origen=_moneda_a_entidad(registro.moneda_origen),
+        moneda_destino=_moneda_a_entidad(registro.moneda_destino),
+        valor_compra=registro.valor_compra,
+        valor_venta=registro.valor_venta,
+        fecha=registro.fecha,
+    )
+
+def _cotizacion_a_modelo(entidad: CotizacionDolar) -> CotizacionDolarORM:
+    """Convierte una entidad de cotización en su registro ORM."""
+    return CotizacionDolarORM(
+        tipo_id=entidad.tipo.id,
+        moneda_origen_id=entidad.moneda_origen.id,
+        moneda_destino_id=entidad.moneda_destino.id,
+        valor_compra=entidad.valor_compra,
+        valor_venta=entidad.valor_venta,
+        fecha=entidad.fecha,
+    )
+
+class RepositorioBD(IRepositorio[T], Generic[T]):
+    """Repositorio base para entidades persistidas en la base de datos.
+
+    Traduce entre las entidades de dominio (pydantic) y los modelos ORM,
+    delegando el acceso a datos en :class:`ConexionDB`.
+    """
+
+    def __init__(self, conexion: ConexionDB, modelo: Type[Any], entidad_cls: Type[T]) -> None:
+        """Inicializa el repositorio con su conexión, modelo ORM y entidad."""
+        self._conexion = conexion
+        self._modelo = modelo
         self._entidad_cls = entidad_cls
-        self._asegurar_archivo()
 
     @property
-    def ruta_archivo(self) -> str:
-        """Ruta del archivo CSV que respalda al repositorio."""
-        return self._ruta_archivo
+    def conexion(self) -> ConexionDB:
+        """Conexión a la base de datos que respalda al repositorio."""
+        return self._conexion
+
+    @property
+    def modelo(self) -> Type[Any]:
+        """Modelo ORM que administra el repositorio."""
+        return self._modelo
 
     @property
     def entidad_cls(self) -> Type[T]:
         """Clase de entidad que administra el repositorio."""
         return self._entidad_cls
 
-    def _asegurar_archivo(self) -> None:
-        """Crea el directorio y el CSV con encabezado si todavía no existe."""
-        os.makedirs(os.path.dirname(self.ruta_archivo) or ".", exist_ok=True)
-        if not os.path.exists(self.ruta_archivo):
-            with open(self.ruta_archivo, "w", encoding="utf-8", newline="") as archivo:
-                escritor = csv.DictWriter(archivo, fieldnames=self._columnas())
-                escritor.writeheader()
+    @abc.abstractmethod
+    def _a_modelo(self, entidad: T) -> Any:
+        """Convierte una entidad de dominio en un registro ORM."""
 
     @abc.abstractmethod
-    def _columnas(self) -> List[str]:
-        """Devuelve los nombres de columnas del CSV."""
+    def _a_entidad(self, registro: Any) -> T:
+        """Convierte un registro ORM en una entidad de dominio."""
 
-    @abc.abstractmethod
-    def _a_fila(self, entidad: T) -> Dict[str, str]:
-        """Convierte una entidad en fila serializable para CSV."""
-
-    @abc.abstractmethod
-    def _desde_fila(self, fila: Dict[str, str]) -> T:
-        """Reconstruye una entidad a partir de una fila de CSV."""
-
-    def _leer_filas(self) -> List[Dict[str, str]]:
-        """Lee todas las filas del CSV y devuelve una lista de diccionarios."""
-        with open(self.ruta_archivo, "r", encoding="utf-8", newline="") as archivo:
-            lector = csv.DictReader(archivo)
-            return list(lector)
-
-    def _escribir_filas(self, filas: List[Dict[str, str]]) -> None:
-        """Reemplaza el contenido del CSV con las filas indicadas."""
-        with open(self.ruta_archivo, "w", encoding="utf-8", newline="") as archivo:
-            escritor = csv.DictWriter(archivo, fieldnames=self._columnas())
-            escritor.writeheader()
-            escritor.writerows(filas)
-
-    def _siguiente_id(self) -> int:
-        """Obtiene el siguiente identificador disponible."""
-        ids = [int(fila["id"]) for fila in self._leer_filas() if fila.get("id")]
-        return (max(ids) + 1) if ids else 1
+    def _opciones_carga(self) -> List[Any]:
+        """Opciones de carga anticipada de relaciones para las consultas."""
+        return []
 
     def crear(self, entidad: T) -> T:
-        """Crea una entidad, asignando ID automático cuando llega con 0."""
-        filas = self._leer_filas()
-        ids_existentes = {int(fila["id"]) for fila in filas if fila.get("id")}
-        if entidad.id == 0:
-            entidad = entidad.model_copy(update={"id": self._siguiente_id()})
-        elif entidad.id in ids_existentes:
-            raise RepositorioError(f"Ya existe un registro con id {entidad.id}.")
-
-        filas.append(self._a_fila(entidad))
-        self._escribir_filas(filas)
-        return entidad
+        """Crea una entidad, respetando el ID cuando llega distinto de 0."""
+        with self.conexion.sesion() as sesion:
+            if entidad.id != 0 and sesion.get(self.modelo, entidad.id) is not None:
+                raise RepositorioError(f"Ya existe un registro con id {entidad.id}.")
+            registro = self._a_modelo(entidad)
+            if entidad.id != 0:
+                registro.id = entidad.id
+            sesion.add(registro)
+            sesion.flush()
+            nuevo_id = registro.id
+        return entidad.model_copy(update={"id": nuevo_id})
 
     def leer_por_id(self, id: int) -> Optional[T]:
         """Busca una entidad por su ID."""
-        for fila in self._leer_filas():
-            if int(fila["id"]) == id:
-                return self._desde_fila(fila)
-        return None
+        with self.conexion.sesion() as sesion:
+            opciones = self._opciones_carga()
+            if opciones:
+                registro = sesion.get(self.modelo, id, options=opciones)
+            else:
+                registro = sesion.get(self.modelo, id)
+            if registro is None:
+                return None
+            return self._a_entidad(registro)
 
     def leer_todos(self) -> List[T]:
         """Lee y reconstruye todas las entidades del repositorio."""
-        return [self._desde_fila(fila) for fila in self._leer_filas()]
+        with self.conexion.sesion() as sesion:
+            consulta = select(self.modelo).options(*self._opciones_carga())
+            return [self._a_entidad(registro) for registro in sesion.scalars(consulta).all()]
 
     def actualizar(self, entidad: T) -> T:
         """Actualiza una entidad existente por ID."""
-        filas = self._leer_filas()
-        encontrada = False
-        for indice, fila in enumerate(filas):
-            if int(fila["id"]) == entidad.id:
-                filas[indice] = self._a_fila(entidad)
-                encontrada = True
-                break
-        if not encontrada:
-            raise RepositorioError(f"No existe un registro con id {entidad.id} para actualizar.")
-        self._escribir_filas(filas)
+        with self.conexion.sesion() as sesion:
+            registro = sesion.get(self.modelo, entidad.id)
+            if registro is None:
+                raise RepositorioError(f"No existe un registro con id {entidad.id} para actualizar.")
+            actualizado = self._a_modelo(entidad)
+            for columna in self.modelo.__table__.columns.keys():
+                if columna != "id":
+                    setattr(registro, columna, getattr(actualizado, columna))
+            sesion.flush()
         return entidad
 
     def eliminar(self, id: int) -> bool:
         """Elimina una entidad por ID, retornando True si hubo cambios."""
-        filas = self._leer_filas()
-        filas_filtradas = [fila for fila in filas if int(fila["id"]) != id]
-        if len(filas_filtradas) == len(filas):
-            return False
-        self._escribir_filas(filas_filtradas)
-        return True
+        with self.conexion.sesion() as sesion:
+            registro = sesion.get(self.modelo, id)
+            if registro is None:
+                return False
+            sesion.delete(registro)
+            return True
 
+class RepositorioMoneda(RepositorioBD[Moneda]):
+    """Repositorio de monedas en base de datos."""
 
-class RepositorioMoneda(RepositorioCSV[Moneda]):
-    """Repositorio CSV de monedas."""
-
-    def __init__(self, ruta_archivo: str) -> None:
+    def __init__(self, conexion: ConexionDB) -> None:
         """Inicializa el repositorio de monedas."""
-        super().__init__(ruta_archivo, Moneda)
+        super().__init__(conexion, MonedaORM, Moneda)
 
-    def _columnas(self) -> List[str]:
-        """Define columnas del archivo de monedas."""
-        return ["id", "codigo", "nombre", "simbolo"]
+    def _a_modelo(self, entidad: Moneda) -> MonedaORM:
+        """Convierte una moneda en su registro ORM."""
+        return _moneda_a_modelo(entidad)
 
-    def _a_fila(self, entidad: Moneda) -> Dict[str, str]:
-        """Serializa una moneda a fila CSV."""
-        return {
-            "id": str(entidad.id),
-            "codigo": entidad.codigo,
-            "nombre": entidad.nombre,
-            "simbolo": entidad.simbolo,
-        }
+    def _a_entidad(self, registro: MonedaORM) -> Moneda:
+        """Construye una moneda desde su registro ORM."""
+        return _moneda_a_entidad(registro)
 
-    def _desde_fila(self, fila: Dict[str, str]) -> Moneda:
-        """Construye una moneda desde una fila CSV."""
-        return Moneda(
-            id=int(fila["id"]),
-            codigo=fila["codigo"],
-            nombre=fila["nombre"],
-            simbolo=fila["simbolo"],
-        )
+class RepositorioGenero(RepositorioBD[Genero]):
+    """Repositorio de géneros literarios en base de datos."""
 
-
-class RepositorioGenero(RepositorioCSV[Genero]):
-    """Repositorio CSV de géneros literarios."""
-
-    def __init__(self, ruta_archivo: str) -> None:
+    def __init__(self, conexion: ConexionDB) -> None:
         """Inicializa el repositorio de géneros."""
-        super().__init__(ruta_archivo, Genero)
+        super().__init__(conexion, GeneroORM, Genero)
 
-    def _columnas(self) -> List[str]:
-        """Define columnas del archivo de géneros."""
-        return ["id", "tipo", "nombre_personalizado", "descripcion"]
+    def _a_modelo(self, entidad: Genero) -> GeneroORM:
+        """Convierte un género en su registro ORM."""
+        return _genero_a_modelo(entidad)
 
-    def _a_fila(self, entidad: Genero) -> Dict[str, str]:
-        """Serializa un género a fila CSV."""
-        return {
-            "id": str(entidad.id),
-            "tipo": entidad.tipo.value,
-            "nombre_personalizado": entidad.nombre_personalizado or "",
-            "descripcion": entidad.descripcion or "",
-        }
+    def _a_entidad(self, registro: GeneroORM) -> Genero:
+        """Construye un género desde su registro ORM."""
+        return _genero_a_entidad(registro)
 
-    def _desde_fila(self, fila: Dict[str, str]) -> Genero:
-        """Construye un género desde una fila CSV."""
-        return Genero(
-            id=int(fila["id"]),
-            tipo=GeneroLiterario(fila["tipo"]),
-            nombre_personalizado=fila["nombre_personalizado"] or None,
-            descripcion=fila["descripcion"] or None,
-        )
+class RepositorioEditorial(RepositorioBD[Editorial]):
+    """Repositorio de editoriales en base de datos."""
 
-
-class RepositorioEditorial(RepositorioCSV[Editorial]):
-    """Repositorio CSV de editoriales."""
-
-    def __init__(self, ruta_archivo: str) -> None:
+    def __init__(self, conexion: ConexionDB) -> None:
         """Inicializa el repositorio de editoriales."""
-        super().__init__(ruta_archivo, Editorial)
+        super().__init__(conexion, EditorialORM, Editorial)
 
-    def _columnas(self) -> List[str]:
-        """Define columnas del archivo de editoriales."""
-        return ["id", "nombre", "pais_origen", "email", "telefono", "sitio_web"]
+    def _a_modelo(self, entidad: Editorial) -> EditorialORM:
+        """Convierte una editorial en su registro ORM."""
+        return _editorial_a_modelo(entidad)
 
-    def _a_fila(self, entidad: Editorial) -> Dict[str, str]:
-        """Serializa una editorial a fila CSV."""
-        return {
-            "id": str(entidad.id),
-            "nombre": entidad.nombre,
-            "pais_origen": entidad.pais_origen,
-            "email": str(entidad.email) if entidad.email else "",
-            "telefono": entidad.telefono or "",
-            "sitio_web": str(entidad.sitio_web) if entidad.sitio_web else "",
-        }
+    def _a_entidad(self, registro: EditorialORM) -> Editorial:
+        """Construye una editorial desde su registro ORM."""
+        return _editorial_a_entidad(registro)
 
-    def _desde_fila(self, fila: Dict[str, str]) -> Editorial:
-        """Construye una editorial desde una fila CSV."""
-        return Editorial(
-            id=int(fila["id"]),
-            nombre=fila["nombre"],
-            pais_origen=fila["pais_origen"],
-            email=fila["email"] or None,
-            telefono=fila["telefono"] or None,
-            sitio_web=fila["sitio_web"] or None,
-        )
+class RepositorioLibro(RepositorioBD[Libro]):
+    """Repositorio de libros con relaciones a editorial y género."""
+
+    def __init__(self, conexion: ConexionDB) -> None:
+        """Inicializa el repositorio de libros."""
+        super().__init__(conexion, LibroORM, Libro)
+
+    def _a_modelo(self, entidad: Libro) -> LibroORM:
+        """Convierte un libro en su registro ORM."""
+        return _libro_a_modelo(entidad)
+
+    def _a_entidad(self, registro: LibroORM) -> Libro:
+        """Construye un libro desde su registro ORM."""
+        return _libro_a_entidad(registro)
+
+    def _opciones_carga(self) -> List[Any]:
+        """Carga anticipada de editorial y género del libro."""
+        return [selectinload(LibroORM.editorial), selectinload(LibroORM.genero)]
+
+class RepositorioPrecio(RepositorioBD[Precio]):
+    """Repositorio de precios con relaciones a libro y moneda."""
+
+    def __init__(self, conexion: ConexionDB) -> None:
+        """Inicializa el repositorio de precios."""
+        super().__init__(conexion, PrecioORM, Precio)
+
+    def _a_modelo(self, entidad: Precio) -> PrecioORM:
+        """Convierte un precio en su registro ORM."""
+        return _precio_a_modelo(entidad)
+
+    def _a_entidad(self, registro: PrecioORM) -> Precio:
+        """Construye un precio desde su registro ORM."""
+        return _precio_a_entidad(registro)
+
+    def _opciones_carga(self) -> List[Any]:
+        """Carga anticipada del libro (con sus relaciones) y de la moneda."""
+        return [ selectinload(PrecioORM.libro).selectinload(LibroORM.editorial),
+                 selectinload(PrecioORM.libro).selectinload(LibroORM.genero),
+                 selectinload(PrecioORM.moneda) ]
 
 
-class RepositorioLibro(RepositorioCSV[Libro]):
-    """Repositorio CSV de libros con relaciones a editorial y género."""
+class RepositorioTipoCotizacion(RepositorioBD[TipoCotizacion]):
+    """Repositorio de tipos de cotización en base de datos."""
 
-    def __init__(self, ruta_archivo: str, repo_editorial: RepositorioEditorial, repo_genero: RepositorioGenero) -> None:
-        """Inicializa el repositorio con sus dependencias relacionadas."""
-        self._repo_editorial = repo_editorial
-        self._repo_genero = repo_genero
-        super().__init__(ruta_archivo, Libro)
+    def __init__(self, conexion: ConexionDB) -> None:
+        """Inicializa el repositorio de tipos de cotización."""
+        super().__init__(conexion, TipoCotizacionORM, TipoCotizacion)
 
-    @property
-    def repo_editorial(self) -> RepositorioEditorial:
-        """Repositorio de editoriales usado para resolver referencias."""
-        return self._repo_editorial
+    def _a_modelo(self, entidad: TipoCotizacion) -> TipoCotizacionORM:
+        """Convierte un tipo de cotización en su registro ORM."""
+        return _tipo_cotizacion_a_modelo(entidad)
 
-    @property
-    def repo_genero(self) -> RepositorioGenero:
-        """Repositorio de géneros usado para resolver referencias."""
-        return self._repo_genero
+    def _a_entidad(self, registro: TipoCotizacionORM) -> TipoCotizacion:
+        """Construye un tipo de cotización desde su registro ORM."""
+        return _tipo_cotizacion_a_entidad(registro)
 
-    def _columnas(self) -> List[str]:
-        """Define columnas del archivo de libros."""
+
+class RepositorioStock(RepositorioBD[Stock], IRepositorioStock):
+    """Repositorio de stock con unicidad por libro."""
+
+    def __init__(self, conexion: ConexionDB) -> None:
+        """Inicializa el repositorio de stock."""
+        super().__init__(conexion, StockORM, Stock)
+
+    def _a_modelo(self, entidad: Stock) -> StockORM:
+        """Convierte un registro de stock en su registro ORM."""
+        return _stock_a_modelo(entidad)
+
+    def _a_entidad(self, registro: StockORM) -> Stock:
+        """Construye un registro de stock desde su registro ORM."""
+        return _stock_a_entidad(registro)
+
+    def _opciones_carga(self) -> List[Any]:
+        """Carga anticipada del libro (con sus relaciones)."""
         return [
-            "id",
-            "isbn",
-            "titulo",
-            "autor",
-            "editorial_id",
-            "genero_id",
-            "edicion",
-            "idioma",
-            "paginas",
-            "fecha_publicacion",
-            "peso",
+            selectinload(StockORM.libro).selectinload(LibroORM.editorial),
+            selectinload(StockORM.libro).selectinload(LibroORM.genero),
         ]
 
-    def _a_fila(self, entidad: Libro) -> Dict[str, str]:
-        """Serializa un libro a fila CSV."""
-        return {
-            "id": str(entidad.id),
-            "isbn": entidad.isbn,
-            "titulo": entidad.titulo,
-            "autor": entidad.autor,
-            "editorial_id": str(entidad.editorial.id),
-            "genero_id": str(entidad.genero.id),
-            "edicion": str(entidad.edicion),
-            "idioma": entidad.idioma,
-            "paginas": "" if entidad.paginas is None else str(entidad.paginas),
-            "fecha_publicacion": entidad.fecha_publicacion.isoformat() if entidad.fecha_publicacion else "",
-            "peso": "" if entidad.peso is None else str(entidad.peso),
-        }
-
-    def _desde_fila(self, fila: Dict[str, str]) -> Libro:
-        """Construye un libro desde una fila CSV, resolviendo sus relaciones."""
-        editorial = self.repo_editorial.leer_por_id(int(fila["editorial_id"]))
-        genero = self.repo_genero.leer_por_id(int(fila["genero_id"]))
-        if not editorial or not genero:
-            raise RepositorioError("No se pudo reconstruir el libro por referencias inexistentes.")
-        return Libro(
-            id=int(fila["id"]),
-            isbn=fila["isbn"],
-            titulo=fila["titulo"],
-            autor=fila["autor"],
-            editorial=editorial,
-            genero=genero,
-            edicion=int(fila["edicion"]),
-            idioma=fila["idioma"],
-            paginas=int(fila["paginas"]) if fila["paginas"] else None,
-            fecha_publicacion=date.fromisoformat(fila["fecha_publicacion"]) if fila["fecha_publicacion"] else None,
-            peso=int(fila["peso"]) if fila["peso"] else None,
-        )
-
-
-class RepositorioPrecio(RepositorioCSV[Precio]):
-    """Repositorio CSV de precios con relaciones a libro y moneda."""
-
-    def __init__(self, ruta_archivo: str, repo_libro: RepositorioLibro, repo_moneda: RepositorioMoneda) -> None:
-        """Inicializa el repositorio de precios con sus dependencias."""
-        self._repo_libro = repo_libro
-        self._repo_moneda = repo_moneda
-        super().__init__(ruta_archivo, Precio)
-
-    @property
-    def repo_libro(self) -> RepositorioLibro:
-        """Repositorio de libros usado para resolver referencias."""
-        return self._repo_libro
-
-    @property
-    def repo_moneda(self) -> RepositorioMoneda:
-        """Repositorio de monedas usado para resolver referencias."""
-        return self._repo_moneda
-
-    def _columnas(self) -> List[str]:
-        """Define columnas del archivo de precios."""
-        return ["id", "libro_id", "moneda_id", "valor", "fecha_vigencia"]
-
-    def _a_fila(self, entidad: Precio) -> Dict[str, str]:
-        """Serializa un precio a fila CSV."""
-        return {
-            "id": str(entidad.id),
-            "libro_id": str(entidad.libro.id),
-            "moneda_id": str(entidad.moneda.id),
-            "valor": str(entidad.valor),
-            "fecha_vigencia": entidad.fecha_vigencia.isoformat(),
-        }
-
-    def _desde_fila(self, fila: Dict[str, str]) -> Precio:
-        """Construye un precio desde una fila CSV."""
-        libro = self.repo_libro.leer_por_id(int(fila["libro_id"]))
-        moneda = self.repo_moneda.leer_por_id(int(fila["moneda_id"]))
-        if not libro or not moneda:
-            raise RepositorioError("No se pudo reconstruir el precio por referencias inexistentes.")
-        return Precio(
-            id=int(fila["id"]),
-            libro=libro,
-            moneda=moneda,
-            valor=Decimal(fila["valor"]),
-            fecha_vigencia=date.fromisoformat(fila["fecha_vigencia"]),
-        )
-
-
-class RepositorioTipoCotizacion(RepositorioCSV[TipoCotizacion]):
-    """Repositorio CSV de tipos de cotización."""
-
-    def __init__(self, ruta_archivo: str) -> None:
-        """Inicializa el repositorio de tipos de cotización."""
-        super().__init__(ruta_archivo, TipoCotizacion)
-
-    def _columnas(self) -> List[str]:
-        """Define columnas del archivo de tipos de cotización."""
-        return ["id", "nombre", "descripcion"]
-
-    def _a_fila(self, entidad: TipoCotizacion) -> Dict[str, str]:
-        """Serializa un tipo de cotización a fila CSV."""
-        return {
-            "id": str(entidad.id),
-            "nombre": entidad.nombre,
-            "descripcion": entidad.descripcion or "",
-        }
-
-    def _desde_fila(self, fila: Dict[str, str]) -> TipoCotizacion:
-        """Construye un tipo de cotización desde una fila CSV."""
-        return TipoCotizacion(
-            id=int(fila["id"]),
-            nombre=fila["nombre"],
-            descripcion=fila["descripcion"] or None,
-        )
-
-
-class RepositorioStock(IRepositorioStock):
-    """Repositorio CSV de stock con unicidad por libro."""
-
-    def __init__(self, ruta_archivo: str, repo_libro: RepositorioLibro) -> None:
-        """Inicializa el repositorio de stock con acceso a libros."""
-        self._ruta_archivo = ruta_archivo
-        self._repo_libro = repo_libro
-        _asegurar_csv(self.ruta_archivo, self._columnas())
-
-    @property
-    def ruta_archivo(self) -> str:
-        """Ruta del archivo CSV que respalda al repositorio."""
-        return self._ruta_archivo
-
-    @property
-    def repo_libro(self) -> RepositorioLibro:
-        """Repositorio de libros usado para resolver referencias."""
-        return self._repo_libro
-
-    def _columnas(self) -> List[str]:
-        """Define columnas del archivo de stock."""
-        return ["id", "libro_id", "cantidad", "stock_minimo", "fecha_ultimo_ingreso"]
-
-    def _a_fila(self, entidad: Stock) -> Dict[str, str]:
-        """Serializa un registro de stock a fila CSV."""
-        return {
-            "id": str(entidad.id),
-            "libro_id": str(entidad.libro.id),
-            "cantidad": str(entidad.cantidad),
-            "stock_minimo": str(entidad.stock_minimo),
-            "fecha_ultimo_ingreso": entidad.fecha_ultimo_ingreso.isoformat() if entidad.fecha_ultimo_ingreso else "",
-        }
-
-    def _desde_fila(self, fila: Dict[str, str]) -> Stock:
-        """Reconstruye un registro de stock desde CSV."""
-        libro = self.repo_libro.leer_por_id(int(fila["libro_id"]))
-        if not libro:
-            raise RepositorioError("No se pudo reconstruir el stock por libro inexistente.")
-        return Stock(
-            id=int(fila["id"]),
-            libro=libro,
-            cantidad=int(fila["cantidad"]),
-            stock_minimo=int(fila["stock_minimo"]),
-            fecha_ultimo_ingreso=date.fromisoformat(fila["fecha_ultimo_ingreso"]) if fila["fecha_ultimo_ingreso"] else None,
-        )
-
-    def crear(self, stock: Stock) -> Stock:
+    def crear(self, entidad: Stock) -> Stock:
         """Crea stock validando que no exista otro para el mismo libro."""
-        if self.leer_por_libro(stock.libro.id):
-            raise RepositorioError(f"Ya existe stock para el libro con id {stock.libro.id}.")
-        filas = _leer_csv(self.ruta_archivo)
-        ids_existentes = {int(fila["id"]) for fila in filas if fila.get("id")}
-        if stock.id == 0:
-            stock = stock.model_copy(update={"id": max(ids_existentes, default=0) + 1})
-        elif stock.id in ids_existentes:
-            raise RepositorioError(f"Ya existe un registro de stock con id {stock.id}.")
-        filas.append(self._a_fila(stock))
-        _escribir_csv(self.ruta_archivo, self._columnas(), filas)
-        return stock
+        if self.leer_por_libro(entidad.libro.id):
+            raise RepositorioError(f"Ya existe stock para el libro con id {entidad.libro.id}.")
+        return super().crear(entidad)
 
     def leer_por_libro(self, libro_id: int) -> Optional[Stock]:
         """Obtiene el registro de stock asociado a un libro."""
-        for fila in _leer_csv(self.ruta_archivo):
-            if int(fila["libro_id"]) == libro_id:
-                return self._desde_fila(fila)
-        return None
+        with self.conexion.sesion() as sesion:
+            consulta = (
+                select(StockORM)
+                .where(StockORM.libro_id == libro_id)
+                .options(*self._opciones_carga())
+            )
+            registro = sesion.scalars(consulta).first()
+            if registro is None:
+                return None
+            return self._a_entidad(registro)
 
-    def leer_todos(self) -> List[Stock]:
-        """Lee todos los registros de stock."""
-        return [self._desde_fila(fila) for fila in _leer_csv(self.ruta_archivo)]
-
-    def actualizar(self, stock: Stock) -> Stock:
+    def actualizar(self, entidad: Stock) -> Stock:
         """Actualiza un registro de stock existente."""
-        existente = self.leer_por_libro(stock.libro.id)
-        if existente and existente.id != stock.id:
-            raise RepositorioError(f"Ya existe otro registro de stock para el libro con id {stock.libro.id}.")
-        filas = _leer_csv(self.ruta_archivo)
-        for indice, fila in enumerate(filas):
-            if int(fila["id"]) == stock.id:
-                filas[indice] = self._a_fila(stock)
-                _escribir_csv(self.ruta_archivo, self._columnas(), filas)
-                return stock
-        raise RepositorioError(f"No existe un registro de stock con id {stock.id} para actualizar.")
+        existente = self.leer_por_libro(entidad.libro.id)
+        if existente and existente.id != entidad.id:
+            raise RepositorioError(f"Ya existe otro registro de stock para el libro con id {entidad.libro.id}.")
+        return super().actualizar(entidad)
 
-    def eliminar(self, libro_id: int) -> bool:
-        """Elimina el stock de un libro por su ID de libro."""
-        filas = _leer_csv(self.ruta_archivo)
-        filas_filtradas = [fila for fila in filas if int(fila["libro_id"]) != libro_id]
-        if len(filas_filtradas) == len(filas):
-            return False
-        _escribir_csv(self.ruta_archivo, self._columnas(), filas_filtradas)
-        return True
+    def eliminar(self, id: int) -> bool:
+        """Elimina el stock de un libro, recibiendo el id del libro."""
+        with self.conexion.sesion() as sesion:
+            consulta = select(StockORM).where(StockORM.libro_id == id)
+            registro = sesion.scalars(consulta).first()
+            if registro is None:
+                return False
+            sesion.delete(registro)
+            return True
 
 
-class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
-    """Repositorio CSV de cotizaciones del dólar por tipo y fecha."""
+class RepositorioCotizacionDolar(RepositorioBD[CotizacionDolar], IRepositorioCotizacionDolar):
+    """Repositorio de cotizaciones del dólar por tipo y fecha."""
 
-    def __init__(
-        self,
-        ruta_archivo: str,
-        repo_moneda: RepositorioMoneda,
-        repo_tipo_cotizacion: RepositorioTipoCotizacion,
-    ) -> None:
-        """Inicializa el repositorio de cotizaciones con acceso a monedas y tipos."""
-        self._ruta_archivo = ruta_archivo
-        self._repo_moneda = repo_moneda
-        self._repo_tipo_cotizacion = repo_tipo_cotizacion
-        _asegurar_csv(self.ruta_archivo, self._columnas())
+    def __init__(self, conexion: ConexionDB) -> None:
+        """Inicializa el repositorio de cotizaciones."""
+        super().__init__(conexion, CotizacionDolarORM, CotizacionDolar)
 
-    @property
-    def ruta_archivo(self) -> str:
-        """Ruta del archivo CSV que respalda al repositorio."""
-        return self._ruta_archivo
+    def _a_modelo(self, entidad: CotizacionDolar) -> CotizacionDolarORM:
+        """Convierte una cotización en su registro ORM."""
+        return _cotizacion_a_modelo(entidad)
 
-    @property
-    def repo_moneda(self) -> RepositorioMoneda:
-        """Repositorio de monedas usado para resolver referencias."""
-        return self._repo_moneda
+    def _a_entidad(self, registro: CotizacionDolarORM) -> CotizacionDolar:
+        """Construye una cotización desde su registro ORM."""
+        return _cotizacion_a_entidad(registro)
 
-    @property
-    def repo_tipo_cotizacion(self) -> RepositorioTipoCotizacion:
-        """Repositorio de tipos de cotización usado para resolver referencias."""
-        return self._repo_tipo_cotizacion
-
-    def _columnas(self) -> List[str]:
-        """Define columnas del archivo de cotizaciones."""
+    def _opciones_carga(self) -> List[Any]:
+        """Carga anticipada del tipo y de las monedas de la cotización."""
         return [
-            "id",
-            "tipo_id",
-            "moneda_origen_id",
-            "moneda_destino_id",
-            "valor_compra",
-            "valor_venta",
-            "fecha",
+            selectinload(CotizacionDolarORM.tipo),
+            selectinload(CotizacionDolarORM.moneda_origen),
+            selectinload(CotizacionDolarORM.moneda_destino),
         ]
 
-    def _a_fila(self, entidad: CotizacionDolar) -> Dict[str, str]:
-        """Serializa una cotización a fila CSV."""
-        return {
-            "id": str(entidad.id),
-            "tipo_id": str(entidad.tipo.id),
-            "moneda_origen_id": str(entidad.moneda_origen.id),
-            "moneda_destino_id": str(entidad.moneda_destino.id),
-            "valor_compra": str(entidad.valor_compra),
-            "valor_venta": str(entidad.valor_venta),
-            "fecha": entidad.fecha.isoformat(),
-        }
-
-    def _desde_fila(self, fila: Dict[str, str]) -> CotizacionDolar:
-        """Reconstruye una cotización desde CSV."""
-        tipo = self.repo_tipo_cotizacion.leer_por_id(int(fila["tipo_id"]))
-        moneda_origen = self.repo_moneda.leer_por_id(int(fila["moneda_origen_id"]))
-        moneda_destino = self.repo_moneda.leer_por_id(int(fila["moneda_destino_id"]))
-        if not tipo or not moneda_origen or not moneda_destino:
-            raise RepositorioError("No se pudo reconstruir la cotización por referencias inexistentes.")
-        return CotizacionDolar(
-            id=int(fila["id"]),
-            tipo=tipo,
-            moneda_origen=moneda_origen,
-            moneda_destino=moneda_destino,
-            valor_compra=Decimal(fila["valor_compra"]),
-            valor_venta=Decimal(fila["valor_venta"]),
-            fecha=datetime.fromisoformat(fila["fecha"]),
-        )
-
-    def crear(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
+    def crear(self, entidad: CotizacionDolar) -> CotizacionDolar:
         """Crea una cotización validando unicidad por tipo y fecha."""
-        if self.leer_por_tipo_y_fecha(cotizacion.tipo, cotizacion.fecha.date()):
+        if self.leer_por_tipo_y_fecha(entidad.tipo, entidad.fecha.date()):
             raise RepositorioError("Ya existe una cotización para ese tipo y fecha.")
-        filas = _leer_csv(self.ruta_archivo)
-        ids_existentes = {int(fila["id"]) for fila in filas if fila.get("id")}
-        if cotizacion.id == 0:
-            cotizacion = cotizacion.model_copy(update={"id": max(ids_existentes, default=0) + 1})
-        elif cotizacion.id in ids_existentes:
-            raise RepositorioError(f"Ya existe una cotización con id {cotizacion.id}.")
-        filas.append(self._a_fila(cotizacion))
-        _escribir_csv(self.ruta_archivo, self._columnas(), filas)
-        return cotizacion
+        return super().crear(entidad)
 
     def leer_por_tipo_y_fecha(
         self,
@@ -783,56 +711,65 @@ class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
     ) -> Optional[CotizacionDolar]:
         """Busca cotización por tipo y fecha (ignorando hora)."""
         tipo = self._normalizar_tipo(tipo_id)
-        for fila in _leer_csv(self.ruta_archivo):
-            fecha_fila = datetime.fromisoformat(fila["fecha"]).date()
-            if int(fila["tipo_id"]) == tipo.id and fecha_fila == fecha:
-                return self._desde_fila(fila)
-        return None
-
-    def leer_todos(self) -> List[CotizacionDolar]:
-        """Lee todas las cotizaciones registradas."""
-        return [self._desde_fila(fila) for fila in _leer_csv(self.ruta_archivo)]
+        with self.conexion.sesion() as sesion:
+            consulta = (
+                select(CotizacionDolarORM)
+                .where(
+                    CotizacionDolarORM.tipo_id == tipo.id,
+                    func.date(CotizacionDolarORM.fecha) == fecha,
+                )
+                .options(*self._opciones_carga())
+            )
+            registro = sesion.scalars(consulta).first()
+            if registro is None:
+                return None
+            return self._a_entidad(registro)
 
     def leer_historico_por_tipo(self, tipo_id: Union[int, TipoCotizacion]) -> List[CotizacionDolar]:
         """Lista histórico de cotizaciones para un tipo dado."""
         tipo = self._normalizar_tipo(tipo_id)
-        cotizaciones = [
-            self._desde_fila(fila) for fila in _leer_csv(self.ruta_archivo) if int(fila["tipo_id"]) == tipo.id
-        ]
-        return sorted(cotizaciones, key=lambda c: c.fecha)
+        with self.conexion.sesion() as sesion:
+            consulta = (
+                select(CotizacionDolarORM)
+                .where(CotizacionDolarORM.tipo_id == tipo.id)
+                .order_by(CotizacionDolarORM.fecha)
+                .options(*self._opciones_carga())
+            )
+            return [self._a_entidad(registro) for registro in sesion.scalars(consulta).all()]
 
-    def actualizar(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
+    def actualizar(self, entidad: CotizacionDolar) -> CotizacionDolar:
         """Actualiza una cotización existente por ID."""
-        existente = self.leer_por_tipo_y_fecha(cotizacion.tipo, cotizacion.fecha.date())
-        if existente and existente.id != cotizacion.id:
+        existente = self.leer_por_tipo_y_fecha(entidad.tipo, entidad.fecha.date())
+        if existente and existente.id != entidad.id:
             raise RepositorioError("Ya existe otra cotización para ese tipo y fecha.")
-        filas = _leer_csv(self.ruta_archivo)
-        for indice, fila in enumerate(filas):
-            if int(fila["id"]) == cotizacion.id:
-                filas[indice] = self._a_fila(cotizacion)
-                _escribir_csv(self.ruta_archivo, self._columnas(), filas)
-                return cotizacion
-        raise RepositorioError(f"No existe una cotización con id {cotizacion.id} para actualizar.")
+        return super().actualizar(entidad)
 
-    def eliminar(self, tipo_id: Union[int, TipoCotizacion], fecha: date) -> bool:
+    def eliminar(self, id: Union[int, TipoCotizacion], fecha: Optional[date] = None) -> bool:
         """Elimina una cotización por tipo y fecha."""
-        tipo = self._normalizar_tipo(tipo_id)
-        filas = _leer_csv(self.ruta_archivo)
-        filas_filtradas = [
-            fila
-            for fila in filas
-            if not (int(fila["tipo_id"]) == tipo.id and datetime.fromisoformat(fila["fecha"]).date() == fecha)
-        ]
-        if len(filas_filtradas) == len(filas):
-            return False
-        _escribir_csv(self.ruta_archivo, self._columnas(), filas_filtradas)
-        return True
+        if fecha is None:
+            tipo = self._normalizar_tipo(id)
+            cotizacion = self.leer_por_tipo_y_fecha(tipo, date.today())
+            if cotizacion is None:
+                return False
+            return super().eliminar(cotizacion.id)
+        tipo = self._normalizar_tipo(id)
+        with self.conexion.sesion() as sesion:
+            consulta = select(CotizacionDolarORM).where(
+                CotizacionDolarORM.tipo_id == tipo.id,
+                func.date(CotizacionDolarORM.fecha) == fecha,
+            )
+            registro = sesion.scalars(consulta).first()
+            if registro is None:
+                return False
+            sesion.delete(registro)
+            return True
 
     def _normalizar_tipo(self, tipo_id: Union[int, TipoCotizacion]) -> TipoCotizacion:
         """Normaliza el tipo de cotización recibido a una entidad TipoCotizacion."""
         if isinstance(tipo_id, TipoCotizacion):
             return tipo_id
-        tipo = self.repo_tipo_cotizacion.leer_por_id(int(tipo_id))
-        if not tipo:
-            raise RepositorioError(f"No existe el tipo de cotización con id {tipo_id}.")
-        return tipo
+        with self.conexion.sesion() as sesion:
+            registro = sesion.get(TipoCotizacionORM, int(tipo_id))
+            if registro is None:
+                raise RepositorioError(f"No existe el tipo de cotización con id {tipo_id}.")
+            return _tipo_cotizacion_a_entidad(registro)

@@ -1,6 +1,3 @@
--- Migración de datos: tabla monedas
--- Generado automáticamente por migrations.py
-
 INSERT INTO monedas (id, codigo, nombre, simbolo) VALUES (1, 'ARS', 'Peso argentino', '$');
 INSERT INTO monedas (id, codigo, nombre, simbolo) VALUES (2, 'USD', 'Dólar estadounidense', 'US$');
 INSERT INTO monedas (id, codigo, nombre, simbolo) VALUES (3, 'EUR', 'Euro', '€');

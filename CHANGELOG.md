@@ -1,3 +1,8 @@
+## [Ejercicio 06]
+- Implementación de modificaciones en repositories.py para que el sistema utilice la base de datos y desestime la persistencia de datos mediante archivos locales. 
+- Pruebas unitarias.
+- Actualización del CHANGELOG.md
+
 ## [Ejercicio 05]
 - Implementación de lógica en migrations.py para generar los scripts .sql a partir de las entradas en los archivos .csv de migration/csv. 
 - Pruebas unitarias de ejecución de los scripts .sql para la migración a Supabase

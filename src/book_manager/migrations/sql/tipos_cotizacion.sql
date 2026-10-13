@@ -1,6 +1,3 @@
--- Migración de datos: tabla tipos_cotizacion
--- Generado automáticamente por migrations.py
-
 INSERT INTO tipos_cotizacion (id, nombre, descripcion) VALUES (1, 'Oficial', 'Cotización oficial publicada por el BCRA.');
 INSERT INTO tipos_cotizacion (id, nombre, descripcion) VALUES (2, 'Blue', 'Cotización del mercado informal (dólar paralelo).');
 INSERT INTO tipos_cotizacion (id, nombre, descripcion) VALUES (3, 'MEP', 'Dólar bolsa / Mercado Electrónico de Pagos.');

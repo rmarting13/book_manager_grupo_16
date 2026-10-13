@@ -113,14 +113,26 @@ def _escribir_sql(ruta_sql: str, tabla: str, sentencias: Sequence[str]) -> None:
         tabla: Nombre de la tabla migrada.
         sentencias: Sentencias ``INSERT`` a guardar.
     """
-    encabezado = (
-        f"-- Migración de datos: tabla {tabla}\n"
-        f"-- Generado automáticamente por migrations.py\n\n"
-    )
     with open(ruta_sql, "w", encoding="utf-8", newline="\n") as archivo:
-        archivo.write(encabezado)
         archivo.write("\n".join(sentencias))
         archivo.write("\n")
+
+def _reajustar_secuencias(conexion: ConexionDB, tablas: Sequence[str]) -> None:
+    """Sincroniza las secuencias de las claves primarias tras la inserción.
+
+    Los ``INSERT`` con ``id`` explícito desfasan la columna ``SERIAL``. 
+    Esta función la reajusta al máximo valor existente en cada tabla.
+
+    Args:
+        conexion: Conexión a la base de datos.
+        tablas: Tablas cuyas secuencias se deben reajustar.
+    """
+    for tabla in tablas:
+        conexion.ejecutar_query(
+            f"SELECT setval(pg_get_serial_sequence('{tabla}', 'id'), "
+            f"COALESCE((SELECT MAX(id) FROM {tabla}), 1), "
+            f"(SELECT COUNT(*) > 0 FROM {tabla}));"
+        )
 
 def migrar_datos(carpeta_csvs: str, carpeta_sqls: str) -> None:
     """Función encargada de la migración de datos de csv a sql.
@@ -157,19 +169,17 @@ def migrar_datos(carpeta_csvs: str, carpeta_sqls: str) -> None:
     )
 
 
-def poblar_base(conexion: ConexionDB, carpeta_csvs: str, carpeta_sqls: str) -> None:
+def ejecutar_migracion(conexion: ConexionDB, carpeta_sqls: str) -> None:
     """Migra los datos de los CSV y los inserta en la base de datos.
 
-    Genera los archivos ``.sql`` con :func:`migrar_datos` y luego ejecuta sus
-    sentencias contra la base, respetando el orden de dependencias entre
-    tablas.
+    Lee los archivos ``.sql`` y ejecuta sus sentencias para migrar los datos a la DB.
 
     Args:
         conexion: Conexión a la base de datos destino.
-        carpeta_csvs: Carpeta donde se encuentran los archivos csv de origen.
         carpeta_sqls: Carpeta donde se guardan los archivos sql generados.
     """
-    migrar_datos(carpeta_csvs, carpeta_sqls)
+    conexion.eliminar_tablas()
+    conexion.crear_tablas()
 
     tablas_insertadas: list[str] = []
     total_insertado = 0
@@ -183,7 +193,7 @@ def poblar_base(conexion: ConexionDB, carpeta_csvs: str, carpeta_sqls: str) -> N
             sentencias = [
                 linea.strip()
                 for linea in archivo_sql
-                if linea.strip() and not linea.strip().startswith("--")
+                if linea.strip()
             ]
 
         with conexion.transaccion() as transaccion:
@@ -194,6 +204,8 @@ def poblar_base(conexion: ConexionDB, carpeta_csvs: str, carpeta_sqls: str) -> N
         total_insertado += len(sentencias)
         print(f"{tabla}: {len(sentencias)} registros insertados")
 
+    _reajustar_secuencias(conexion, tablas_insertadas)
+    
     PrinterUtil.dibujar_separador(f"Base poblada: {len(tablas_insertadas)} tablas, {total_insertado} registros")
 
 
@@ -215,9 +227,7 @@ if __name__ == "__main__":
 
     PrinterUtil.dibujar_separador("2. Poblado de la base de datos")
     conexion = ConexionDB(URL_BD)
-    conexion.eliminar_tablas()
-    conexion.crear_tablas()
-    poblar_base(conexion, CARPETA_CSVS, CARPETA_SQLS)
+    ejecutar_migracion(conexion, CARPETA_SQLS)
 
     PrinterUtil.dibujar_separador("3. Verificación de los datos migrados")
     for tabla, _ in ORDEN_MIGRACION:

@@ -1,6 +1,3 @@
--- Migración de datos: tabla stock
--- Generado automáticamente por migrations.py
-
 INSERT INTO stock (id, libro_id, cantidad, stock_minimo, fecha_ultimo_ingreso) VALUES (1, 1, 20, 5, '2026-10-11');
 INSERT INTO stock (id, libro_id, cantidad, stock_minimo, fecha_ultimo_ingreso) VALUES (2, 2, 3, 5, '2026-10-08');
 INSERT INTO stock (id, libro_id, cantidad, stock_minimo, fecha_ultimo_ingreso) VALUES (3, 3, 14, 4, '2026-10-05');

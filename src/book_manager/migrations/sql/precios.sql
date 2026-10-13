@@ -1,6 +1,3 @@
--- Migración de datos: tabla precios
--- Generado automáticamente por migrations.py
-
 INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (1, 1, 1, 12500, '2026-10-11');
 INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (2, 2, 1, 14200, '2026-10-10');
 INSERT INTO precios (id, libro_id, moneda_id, valor, fecha_vigencia) VALUES (3, 3, 1, 15900, '2026-10-09');

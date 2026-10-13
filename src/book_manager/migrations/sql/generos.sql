@@ -1,6 +1,3 @@
--- Migración de datos: tabla generos
--- Generado automáticamente por migrations.py
-
 INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (1, 'Novela', NULL, 'Narrativa de ficción de extensión media o larga.');
 INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (2, 'Ensayo', NULL, 'Obras de análisis y reflexión.');
 INSERT INTO generos (id, tipo, nombre_personalizado, descripcion) VALUES (3, 'Poesía', NULL, 'Composición literaria en verso o prosa poética.');

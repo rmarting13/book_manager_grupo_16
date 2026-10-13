@@ -1,6 +1,3 @@
--- Migración de datos: tabla editoriales
--- Generado automáticamente por migrations.py
-
 INSERT INTO editoriales (id, nombre, pais_origen, email, telefono, sitio_web) VALUES (1, 'Planeta', 'Argentina', 'contacto@planeta.com.ar', NULL, 'https://www.planetadelibros.com.ar/');
 INSERT INTO editoriales (id, nombre, pais_origen, email, telefono, sitio_web) VALUES (2, 'Sudamericana', 'Argentina', 'info@sudamericana.com.ar', NULL, 'https://www.megustaleer.com.ar/');
 INSERT INTO editoriales (id, nombre, pais_origen, email, telefono, sitio_web) VALUES (3, 'Alfaguara', 'España', 'atencion@alfaguara.com', NULL, 'https://www.penguinlibros.com/');

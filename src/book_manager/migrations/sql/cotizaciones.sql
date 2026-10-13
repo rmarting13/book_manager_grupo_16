@@ -1,6 +1,3 @@
--- Migración de datos: tabla cotizaciones
--- Generado automáticamente por migrations.py
-
 INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (1, 1, 2, 1, 1120, 1160, '2026-10-11T12:00:00');
 INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (2, 2, 2, 1, 1280, 1315, '2026-10-11T12:00:00');
 INSERT INTO cotizaciones (id, tipo_id, moneda_origen_id, moneda_destino_id, valor_compra, valor_venta, fecha) VALUES (3, 3, 2, 1, 1230, 1258, '2026-10-11T12:00:00');
