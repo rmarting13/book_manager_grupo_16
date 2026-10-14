@@ -39,7 +39,7 @@ def main(import_default_data: bool = False) -> None:
     URL_BD: str = RUTA_BD.replace("[YOUR-PASSWORD]", PASSWORD)
 
     conexion = ConexionDB(URL_BD)
-    conexion.crear_tablas()
+    # conexion.crear_tablas()
 
     if import_default_data:
         ejecutar_migracion(conexion, RUTA_SQL)

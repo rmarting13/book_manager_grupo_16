@@ -1,3 +1,11 @@
+## [Ejercicio 08]
+- Implementación de lógica en console.py para nuevas funcionalidades en menú principal:
+    - Obtener las cotizaciones por api
+    - Ver lista de precios bimonetaria
+    - Exportar precios a CSV
+- Pruebas unitarias.
+- Actualización del CHANGELOG.md
+
 ## [Ejercicio 07]
 - Modificación del servicio ServicioCotizacionDolar en services.py para obtener las cotizaciones desde la API dolarapi. 
 - Pruebas unitarias del consumo de la API desde el servicio ServicioCotizacionDolar.

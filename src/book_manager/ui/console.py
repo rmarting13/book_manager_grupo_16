@@ -1,9 +1,9 @@
 from datetime import date, datetime, time
 from decimal import Decimal
+import csv
+import os
 from typing import Callable, Dict, List, Optional, Tuple, overload
-
 from pydantic import ValidationError
-
 from book_manager.utilities.utilities import PrinterUtil
 from book_manager.entities.entities import (
     CotizacionDolar, Editorial, Genero, GeneroLiterario, Libro, Moneda, Precio, Stock, TipoCotizacion,
@@ -223,6 +223,9 @@ class ConsolaInventario:
                 ("Gestionar stock", self._menu_stock),
                 ("Gestionar tipos de cotización", self._menu_tipos_cotizacion),
                 ("Cotizaciones del dólar", self._menu_cotizaciones),
+                ("Obtener las cotizaciones por api", self._obtener_cotizaciones_api),
+                ("Ver lista de precios bimonetaria", self._listar_precios_bimonetaria),
+                ("Exportar precios a CSV", self._exportar_precios_csv),
             ], salir="Salir")
         except (EOFError, KeyboardInterrupt):
             print()
@@ -887,3 +890,104 @@ class ConsolaInventario:
         usar_venta = confirmar("¿Usar cotización de venta? (n = compra)")
         total = self._cotizaciones.convertir(monto, tipo, usar_venta)
         print(f"USD {monto:,.2f} = ARS {total:,.2f} (dólar {tipo.nombre})")
+
+    def _obtener_cotizaciones_api(self) -> None:
+        """Descarga las cotizaciones desde la API y las registra en la base."""
+        cotizaciones = self._cotizaciones.obtener_cotizaciones()
+        self._mostrar_cotizaciones(cotizaciones)
+        print(f"Cotizaciones registradas o actualizadas: {len(cotizaciones)}")
+
+    def _listar_precios_bimonetaria(self) -> None:
+        """Muestra el precio vigente de cada libro en pesos y en otra moneda."""
+        libros = self._libros.listar()
+        if not libros:
+            print("No hay libros registrados.")
+            return
+        moneda_base = self._moneda_base()
+        moneda_alterna = self._elegir_moneda_alterna(moneda_base)
+        tipo = self._elegir_tipo_cotizacion()
+        cotizacion = self._cotizaciones.obtener_ultima(tipo)
+        print(f"Conversión con dólar {tipo.nombre}: compra {cotizacion.valor_compra:,.2f} / "
+              f"venta {cotizacion.valor_venta:,.2f} ({cotizacion.fecha:%Y-%m-%d %H:%M})")
+        PrinterUtil.imprimir_tabla(
+            ["ID", "Título", f"Precio ({moneda_base.codigo})", f"Precio ({moneda_alterna.codigo})"],
+            [
+                [
+                    str(libro.id),
+                    libro.titulo,
+                    self._texto_precio(self._precios.obtener_vigente(libro.id, moneda_base.id)),
+                    self._texto_precio(self._precio_convertido(libro.id, moneda_base, moneda_alterna, cotizacion)),
+                ]
+                for libro in libros
+            ],
+        )
+
+    def _precio_convertido(
+        self,
+        libro_id: int,
+        moneda_base: Moneda,
+        moneda_alterna: Moneda,
+        cotizacion: CotizacionDolar,
+    ) -> Optional[Precio]:
+        """Devuelve el precio en la moneda alterna, convirtiendo desde la base si hace falta."""
+        directo = self._precios.obtener_vigente(libro_id, moneda_alterna.id)
+        if directo:
+            return directo
+        precio_base = self._precios.obtener_vigente(libro_id, moneda_base.id)
+        if precio_base is None:
+            return None
+        valor = self._convertir_entre_monedas(precio_base.valor, moneda_base, moneda_alterna, cotizacion)
+        return Precio(libro=precio_base.libro, moneda=moneda_alterna, valor=valor,
+                      fecha_vigencia=precio_base.fecha_vigencia)
+
+    @staticmethod
+    def _convertir_entre_monedas(
+        valor: Decimal,
+        moneda_origen: Moneda,
+        moneda_destino: Moneda,
+        cotizacion: CotizacionDolar,
+    ) -> Decimal:
+        """Convierte un valor entre dos monedas usando la cotización del dólar."""
+        if moneda_origen.id == moneda_destino.id:
+            return valor
+        if moneda_origen.id == cotizacion.moneda_origen.id:
+            return (valor * cotizacion.valor_venta).quantize(Decimal("0.01"))
+        if moneda_origen.id == cotizacion.moneda_destino.id:
+            return (valor / cotizacion.valor_compra).quantize(Decimal("0.01"))
+        raise ServicioError(
+            f"No se puede convertir de {moneda_origen.codigo} a {moneda_destino.codigo}: "
+            f"la cotización es {cotizacion.moneda_origen.codigo}/{cotizacion.moneda_destino.codigo}."
+        )
+
+    def _exportar_precios_csv(self) -> None:
+        """Exporta los precios vigentes de todos los libros y monedas a un CSV."""
+        libros = self._libros.listar()
+        monedas = self._monedas.listar()
+        if not libros or not monedas:
+            print("Se necesitan libros y monedas para exportar los precios.")
+            return
+        ruta = os.path.join(os.getcwd(), "bajada_precios.csv")
+        with open(ruta, "w", newline="", encoding="utf-8") as archivo:
+            escritor = csv.writer(archivo)
+            escritor.writerow(["ID", "ISBN", "Título", "Autor"] + [m.codigo for m in monedas])
+            for libro in libros:
+                fila = [str(libro.id), libro.isbn, libro.titulo, libro.autor]
+                for moneda in monedas:
+                    precio = self._precios.obtener_vigente(libro.id, moneda.id)
+                    fila.append(f"{precio.valor:.2f}" if precio else "")
+                escritor.writerow(fila)
+        print(f"Precios exportados en: {ruta}")
+
+    def _elegir_moneda_alterna(self, moneda_base: Moneda) -> Moneda:
+        """Pide una moneda distinta de la base para la vista bimonetaria."""
+        monedas = [m for m in self._monedas.listar() if m.id != moneda_base.id]
+        if not monedas:
+            raise ServicioError("No hay otra moneda disponible además de la base.")
+        PrinterUtil.imprimir_tabla(
+            ["ID", "Código", "Nombre"], [[str(m.id), m.codigo, m.nombre] for m in monedas]
+        )
+        while True:
+            moneda = self._monedas.obtener(pedir_entero("ID de la moneda alternativa", minimo=1))
+            if moneda.id != moneda_base.id:
+                return moneda
+            print("Elija una moneda distinta de la base.")

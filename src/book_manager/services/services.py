@@ -785,9 +785,7 @@ class ServicioCotizacionDolar:
 
 if __name__ == "__main__":
     import os
-
     from dotenv import load_dotenv
-
     from book_manager.database.connection import ConexionDB
     from book_manager.utilities.utilities import PrinterUtil
 
