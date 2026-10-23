@@ -169,6 +169,32 @@ def migrar_datos(carpeta_csvs: str, carpeta_sqls: str) -> None:
     )
 
 
+def cargar_datos_sql(conexion: ConexionDB, ruta_sql: str) -> int:
+    """Carga en la base de datos las sentencias de un archivo ``.sql``.
+
+    Lee el archivo indicado, ejecuta cada sentencia dentro de una única
+    transacción y devuelve la cantidad de sentencias ejecutadas.
+
+    Args:
+        conexion: Conexión a la base de datos destino.
+        ruta_sql: Ruta del archivo ``.sql`` con las sentencias a ejecutar.
+
+    Returns:
+        Cantidad de sentencias ejecutadas.
+
+    Raises:
+        FileNotFoundError: Si el archivo indicado no existe.
+    """
+    with open(ruta_sql, encoding="utf-8") as archivo_sql:
+        sentencias = [linea.strip() for linea in archivo_sql if linea.strip()]
+
+    with conexion.transaccion() as transaccion:
+        for sentencia in sentencias:
+            transaccion.execute(text(sentencia))
+
+    return len(sentencias)
+
+
 def ejecutar_migracion(conexion: ConexionDB, carpeta_sqls: str) -> None:
     """Migra los datos de los CSV y los inserta en la base de datos.
 
@@ -189,20 +215,11 @@ def ejecutar_migracion(conexion: ConexionDB, carpeta_sqls: str) -> None:
         if not os.path.exists(ruta_sql):
             continue
 
-        with open(ruta_sql, encoding="utf-8") as archivo_sql:
-            sentencias = [
-                linea.strip()
-                for linea in archivo_sql
-                if linea.strip()
-            ]
-
-        with conexion.transaccion() as transaccion:
-            for sentencia in sentencias:
-                transaccion.execute(text(sentencia))
+        cantidad = cargar_datos_sql(conexion, ruta_sql)
 
         tablas_insertadas.append(tabla)
-        total_insertado += len(sentencias)
-        print(f"{tabla}: {len(sentencias)} registros insertados")
+        total_insertado += cantidad
+        print(f"{tabla}: {cantidad} registros insertados")
 
     _reajustar_secuencias(conexion, tablas_insertadas)
     
