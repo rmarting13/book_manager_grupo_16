@@ -1,3 +1,8 @@
+## [Ejercicio 03]
+- Implementación del scraper `cuspide_scraper` al proyecto con configuración, spider, items, loaders y pipelines. El scraper cuenta con integración con la base de datos para levantar el catálogo de libros a buscar directamente desde la BD en Supabase.
+- Pruebas unitarias desde la terminal. Se generó el archivo `scraper/cuspide_scraper/downloads/cuspide.py` con los resultados.
+- Actualización de los archivos `requirements.txt` y `CHANGELOG.md`
+
 ## [Ejercicio 02]
 - Creación de la función `cargar_datos_sql` en el archivo `migrations.py`. La función se reutiliza en la función `ejecutar_migracion` reemplazando la lógica de lectura y ejecución de sentencias sql.
 - Actualización de los archivos README.md y CHANGELOG.md
