@@ -56,9 +56,13 @@ ITEM_PIPELINES = {
     "cuspide_scraper.pipelines.DuplicadosPipeline": 200,
     "cuspide_scraper.pipelines.LimpiezaPipeline": 300,
     "cuspide_scraper.pipelines.JsonPipeline": 400,
+    "cuspide_scraper.pipelines.AlertaPreciosPipeline": 500,
 }
 
 CUSPIDE_JSON_PATH = "downloads/cuspide.json"
+
+# Archivo CSV con las alertas de diferencia de precios entre el catálogo y el sitio.
+CUSPIDE_ALERTAS_PATH = "downloads/alerta_precios"
 
 # Set settings whose default value is deprecated to a future-proof value
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
