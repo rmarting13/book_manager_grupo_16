@@ -1,3 +1,7 @@
+## [Ejercicio 05]
+- Implementación del archivo `reportes/reportes.py` que cuya clase `ReporteAlertasPrecios` se encarga de generar un reporte XLSX de libros y diferencias de precios a partir de los archivos CSV de alerta de precios generados por el scraper.
+- Actualización de los archivos `CHANGELOG.md` y `requirements.txt`
+
 ## [Ejercicio 04]
 - Se implementó el pipeline `AlertaPreciosPipeline`  en `cuspide_scraper` para procesar la comparación de precios entre el catálogo de la base de datos y los obtenidos del sitio web.
 - Se modificó `DuplicadosPipeline` para mejorar la coincidencia con el catálogo: el libro del sitio debe coincidir en título y autor con un libro de la BD, si no coincide en ambos se descarta con `DropItem`.
