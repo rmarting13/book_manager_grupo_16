@@ -1,3 +1,8 @@
+## [Ejercicio 06]
+- Implementación del decorador (función) `auditar` definido en el archivo `utilities/auditoria.py`. Esta función se implementó como decorador en todos los métodos públicos de las clases en `services.py` con los cuales el usuario tiene interacción desde la consola, registrando cada operación realizada por el usuario.
+- Pruebas unitarias del decorador y su función log que escribe el archivo en `utilities/logs`.
+- Actualización del archivo `CHANGELOG.md`.
+
 ## [Ejercicio 05]
 - Implementación del archivo `reportes/reportes.py` que cuya clase `ReporteAlertasPrecios` se encarga de generar un reporte XLSX de libros y diferencias de precios a partir de los archivos CSV de alerta de precios generados por el scraper.
 - Actualización de los archivos `CHANGELOG.md` y `requirements.txt`
