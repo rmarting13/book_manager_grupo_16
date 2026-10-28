@@ -1,3 +1,8 @@
+## [Ejercicio 07]
+- Se agregaron las siguientes opciones de menú: `Ejecutar scraping`, `Generar reporte` y `Ver historial de auditoría`. 
+- Se implementó un decorador (función) `auditar_salida` definido en el archivo `utilities/auditoria.py` para capturar como detalle las salidas impresas de funcionalidades como `Ejecutar scraping` y `Generar reporte`.
+- Actualización del archivo `CHANGELOG.md`.
+
 ## [Ejercicio 06]
 - Implementación del decorador (función) `auditar` definido en el archivo `utilities/auditoria.py`. Esta función se implementó como decorador en todos los métodos públicos de las clases en `services.py` con los cuales el usuario tiene interacción desde la consola, registrando cada operación realizada por el usuario.
 - Pruebas unitarias del decorador y su función log que escribe el archivo en `utilities/logs`.

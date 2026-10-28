@@ -1,10 +1,17 @@
 from datetime import date, datetime, time
 from decimal import Decimal
 import csv
+import glob
+import json
 import os
+import shutil
+import subprocess
+import sys
 from typing import Callable, Dict, List, Optional, Tuple, overload
 from pydantic import ValidationError
 from book_manager.utilities.utilities import PrinterUtil
+from book_manager.utilities.auditoria import auditar, auditar_salida, ruta_auditoria
+from book_manager.reportes.reportes import ReporteAlertasPrecios, ReporteError
 from book_manager.entities.entities import (
     CotizacionDolar, Editorial, Genero, GeneroLiterario, Libro, Moneda, Precio, Stock, TipoCotizacion,
 )
@@ -24,6 +31,31 @@ from book_manager.services.services import (
 Opcion = Tuple[str, Callable[[], None]]
 
 CAMPO_OBLIGATORIO = 'El campo es obligatorio'
+
+# Rutas del proyecto Scrapy de Cúspide:
+RUTA_PROYECTO_SCRAPER = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scraper")
+)
+RUTA_DOWNLOADS_SCRAPER = os.path.join(RUTA_PROYECTO_SCRAPER, "downloads")
+
+# Carpeta donde se escriben los reportes Excel generados:
+RUTA_REPORTES_DOWNLOADS = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "reportes", "downloads")
+)
+
+# Intérprete del entorno virtual del proyecto, que es el que tiene Scrapy instalado:
+RUTA_RAIZ_PROYECTO = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
+)
+RUTA_PYTHON_VENV = os.path.join(
+    RUTA_RAIZ_PROYECTO, "env", "Scripts", "python.exe"
+)
+RUTA_SCRAPY_VENV = os.path.join(
+    RUTA_RAIZ_PROYECTO, "env", "Scripts", "scrapy.exe"
+)
+RUTA_SCRAPY_VENV_LINUX = os.path.join(
+    RUTA_RAIZ_PROYECTO, "env", "bin", "scrapy"
+)
 
 def pedir_texto(mensaje: str) -> str:
     """Pide por pantalla un texto obligatorio."""
@@ -226,6 +258,9 @@ class ConsolaInventario:
                 ("Obtener las cotizaciones por api", self._obtener_cotizaciones_api),
                 ("Ver lista de precios bimonetaria", self._listar_precios_bimonetaria),
                 ("Exportar precios a CSV", self._exportar_precios_csv),
+                ("Ejecutar scraping", self._ejecutar_scraping),
+                ("Generar reporte", self._generar_reporte),
+                ("Ver historial de auditoría", self._ver_historial_auditoria),
             ], salir="Salir")
         except (EOFError, KeyboardInterrupt):
             print()
@@ -977,6 +1012,130 @@ class ConsolaInventario:
                     fila.append(f"{precio.valor:.2f}" if precio else "")
                 escritor.writerow(fila)
         print(f"Precios exportados en: {ruta}")
+
+    # ----- Scraping, reportes y auditoría -----
+
+    @auditar_salida("EJECUTAR_SCRAPING")
+    def _ejecutar_scraping(self) -> None:
+        """Ejecuta el rastreo de Cúspide y genera el CSV de alertas de precios."""
+        print("El rastreo de la web de Cúspide puede tardar unos minutos...")
+        titulos = pedir_opcional("Títulos a buscar (separados por |, vacío = todos)")
+        comando = self._comando_scraping()
+        comando.extend(["crawl", "cuspide"])
+        if titulos:
+            comando.extend(["-a", f"titulos={titulos}"])
+        print(f"Ejecutando: {' '.join(comando)}")
+        resultado = subprocess.run(
+            comando,
+            cwd=RUTA_PROYECTO_SCRAPER,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if resultado.returncode != 0:
+            salida = (resultado.stderr or "").strip() or (resultado.stdout or "").strip()
+            ultimas_lineas = "\n".join(salida.splitlines()[-5:]) if salida else "(sin salida)"
+            raise ServicioError(f"El rastreo de Cúspide falló:\n{ultimas_lineas}")
+        items = 0
+        ruta_json = os.path.join(RUTA_DOWNLOADS_SCRAPER, "cuspide.json")
+        if os.path.exists(ruta_json):
+            try:
+                with open(ruta_json, encoding="utf-8") as archivo:
+                    datos = json.load(archivo)
+                items = len(datos) if isinstance(datos, list) else 0
+            except (OSError, ValueError):
+                items = 0
+        print(f"Items guardados: {items}")
+        archivos = sorted(glob.glob(os.path.join(RUTA_DOWNLOADS_SCRAPER, "alerta_precios_*.csv")))
+        if archivos:
+            print(f"Archivo de alertas: {archivos[-1]}")
+        else:
+            print(f"No se encontró un archivo de alertas en {RUTA_DOWNLOADS_SCRAPER}.")
+        if items == 0:
+            print(
+                "El rastreo no obtuvo resultados. Revise la salida del rastreo: "
+                "puede que el sitio esté caído o bloqueando las peticiones."
+            )
+
+    @staticmethod
+    def _comando_scraping() -> List[str]:
+        """Devuelve el comando base para ejecutar Scrapy.
+
+        Compatible con el ejecutable de Scrapy del entorno virtual del
+        proyecto (Windows y Linux), el ejecutable de Scrapy del ``PATH`` 
+        donde las dependencias se instalan en el sistema y, 
+        el intérprete de Python actual con ``-m scrapy``.
+
+        Returns:
+            La lista con el ejecutable y sus argumentos iniciales.
+
+        Raises:
+            ServicioError: Si no se encuentra ninguna forma de ejecutar Scrapy.
+        """
+        if os.path.exists(RUTA_SCRAPY_VENV):
+            return [RUTA_SCRAPY_VENV]
+        if os.path.exists(RUTA_SCRAPY_VENV_LINUX):
+            return [RUTA_SCRAPY_VENV_LINUX]
+        ruta_path = shutil.which("scrapy")
+        if ruta_path:
+            return [ruta_path]
+        if subprocess.run(
+            [sys.executable, "-c", "import scrapy"],
+            capture_output=True,
+        ).returncode == 0:
+            return [sys.executable, "-m", "scrapy"]
+        raise ServicioError(
+            "No se encontró Scrapy en el sistema.\n"
+            f"Ejecutables buscados: {RUTA_SCRAPY_VENV}, {RUTA_SCRAPY_VENV_LINUX}, "
+            f"'scrapy' en el PATH\n"
+            "Instale las dependencias con: "
+            f'"{sys.executable}" -m pip install -r requirements.txt'
+        )
+
+    @auditar_salida("GENERAR_REPORTE")
+    def _generar_reporte(self) -> None:
+        """Genera el reporte Excel con las alertas de precios del scraping."""
+        archivos = sorted(glob.glob(os.path.join(RUTA_DOWNLOADS_SCRAPER, "alerta_precios_*.csv")))
+        if not archivos:
+            print("No hay archivos de alertas. Ejecute primero el scraping.")
+            return
+        print(f"Archivos de alertas incluidos: {len(archivos)}")
+        try:
+            reporte = ReporteAlertasPrecios(archivos)
+            ruta_xlsx = reporte.generar(
+                os.path.join(RUTA_REPORTES_DOWNLOADS, "reporte_alertas_precios.xlsx")
+            )
+        except ReporteError as exc:
+            print(f"Error: {exc}")
+            return
+        print(f"Reporte generado: {ruta_xlsx}")
+        print(f"Filas del reporte: {len(reporte.filas)}")
+
+    @auditar("VER_HISTORIAL_AUDITORIA")
+    def _ver_historial_auditoria(self) -> None:
+        """Muestra las últimas operaciones registradas en la auditoría."""
+        ruta = ruta_auditoria()
+        if not os.path.exists(ruta):
+            print("El historial de auditoría está vacío.")
+            return
+        with open(ruta, encoding="utf-8") as archivo:
+            lineas = [linea.rstrip("\n") for linea in archivo if linea.strip()]
+        if not lineas:
+            print("El historial de auditoría está vacío.")
+            return
+        PrinterUtil.imprimir_tabla(
+            ["Acción", "Fecha y hora", "Detalle"],
+            [self._fila_historial_auditoria(linea) for linea in lineas],
+        )
+
+    @staticmethod
+    def _fila_historial_auditoria(linea: str) -> List[str]:
+        """Convierte una línea del log de auditoría en una fila de la tabla."""
+        partes = linea.split(" | ", 2)
+        if len(partes) == 3:
+            return partes
+        return ["-", "-", linea]
 
     def _elegir_moneda_alterna(self, moneda_base: Moneda) -> Moneda:
         """Pide una moneda distinta de la base para la vista bimonetaria."""

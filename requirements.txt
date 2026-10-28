@@ -3,6 +3,8 @@ debugpy==1.8.22
 dnspython==2.8.0
 email-validator==2.3.0
 idna==3.20
+itemadapter==0.13.1
+itemloaders==1.5.0
 nodeenv==1.11.0
 openpyxl==3.1.5
 psycopg==3.3.6

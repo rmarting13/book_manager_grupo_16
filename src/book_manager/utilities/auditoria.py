@@ -1,7 +1,9 @@
+import contextlib
 import functools
+import io
 import os
 from datetime import datetime
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from book_manager.utilities.utilities import PrinterUtil
@@ -12,6 +14,9 @@ RUTA_AUDITORIA_POR_DEFECTO = os.path.join(
 )
 
 LONGITUD_MAXIMA_DETALLE = 200
+
+# Cantidad de líneas de la salida de consola que se guardan en el detalle.
+LINEAS_MAXIMAS_SALIDA = 5
 
 
 def ruta_auditoria() -> str:
@@ -138,6 +143,111 @@ def auditar(accion: str, ruta: Optional[str] = None) -> Callable:
     return decorador
 
 
+@contextlib.contextmanager
+def capturar_salida() -> Iterator[List[str]]:
+    """Captura lo que se imprime en consola durante el bloque ``with``.
+
+    La salida se sigue mostrando en pantalla y, además, se guarda línea por
+    línea en la lista que devuelve el contexto.
+
+    Yields:
+        La lista donde se acumulan las líneas impresas.
+    """
+    lineas: List[str] = []
+    buffer = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buffer):
+            yield lineas
+    finally:
+        _volcar_salida(buffer, lineas)
+
+
+def _volcar_salida(buffer: io.StringIO, lineas: List[str]) -> None:
+    """Muestra en pantalla y acumula en ``lineas`` lo capturado en el buffer.
+
+    Args:
+        buffer: Buffer donde se capturó la salida.
+        lineas: Lista donde se acumulan las líneas no vacías.
+    """
+    for linea in buffer.getvalue().splitlines():
+        texto = linea.strip()
+        if texto:
+            lineas.append(texto)
+            print(linea)
+    buffer.seek(0)
+    buffer.truncate(0)
+
+
+def _resumir_salida(lineas: List[str]) -> str:
+    """Resume la salida capturada para incluirla en el detalle.
+
+    Args:
+        lineas: Líneas impresas por la función decorada.
+
+    Returns:
+        Las últimas líneas de la salida unidas con ``; ``.
+    """
+    if not lineas:
+        return ""
+    ultimas = lineas[-LINEAS_MAXIMAS_SALIDA:]
+    resumen = "; ".join(ultimas)
+    if len(lineas) > LINEAS_MAXIMAS_SALIDA:
+        resumen = f"(últimas {LINEAS_MAXIMAS_SALIDA} de {len(lineas)} líneas) {resumen}"
+    return resumen
+
+
+def auditar_salida(accion: str, ruta: Optional[str] = None) -> Callable:
+    """Decora una función para auditar su ejecución junto con su salida.
+
+    Es igual que :func:`auditar`, pero además del detalle de la llamada
+    registra en el detalle las últimas líneas que la función imprimió en
+    consola. Pensado para acciones que informan su resultado por pantalla,
+    como el scraping o la generación de reportes.
+
+    Args:
+        accion: Nombre literal de la acción a registrar (ej. ``EJECUTAR_SCRAPING``).
+        ruta: Ruta del archivo de auditoría. Si es ``None``, se usa la ruta
+            configurada en ``.env``.
+
+    Returns:
+        El decorador que envuelve la función.
+    """
+    if not accion:
+        raise ValueError("El decorador auditar_salida necesita el nombre de la acción.")
+
+    def decorador(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def envoltura(*args: Any, **kwargs: Any) -> Any:
+            detalle = _detalle_llamada(func, args, kwargs)
+            resultado: Any = None
+            error_capturado: Optional[Exception] = None
+
+            with capturar_salida() as lineas:
+                try:
+                    resultado = func(*args, **kwargs)
+                except Exception as error:
+                    error_capturado = error
+            if error_capturado is not None:
+                log(
+                    accion,
+                    f"{detalle} -> {type(error_capturado).__name__}: {error_capturado} "
+                    f"| salida: {_resumir_salida(lineas)}",
+                    resultado="ERROR",
+                    ruta=ruta,
+                )
+                raise error_capturado
+            log(
+                accion,
+                f"{detalle} -> {_resumir_valor(resultado)} | salida: {_resumir_salida(lineas)}",
+                ruta=ruta,
+            )
+            return resultado
+
+        return envoltura
+
+    return decorador
+
+
 # Pruebas unitarias:
 if __name__ == '__main__':
     import tempfile
@@ -196,6 +306,40 @@ if __name__ == '__main__':
 
     try:
         auditar("")
+    except ValueError as error:
+        print(f"Error esperado: {error}")
+
+    # 5. Decorador que registra también la salida de consola
+    PrinterUtil.dibujar_separador("5. Decorador auditar_salida")
+
+    @auditar_salida("PROCESO_CON_SALIDA", ruta=ruta_prueba)
+    def proceso_con_salida() -> None:
+        print("Paso 1: iniciando")
+        print("Paso 2: procesando")
+        print("Paso 3: terminado")
+
+    proceso_con_salida()
+    with open(ruta_prueba, encoding="utf-8") as archivo:
+        ultima = archivo.readlines()[-1].rstrip("\n")
+    print(f"Última línea del log: {ultima}")
+    assert "salida: Paso 1: iniciando; Paso 2: procesando; Paso 3: terminado" in ultima
+
+    @auditar_salida("PROCESO_CON_ERROR", ruta=ruta_prueba)
+    def proceso_con_error() -> None:
+        print("Paso 1: iniciando")
+        raise ValueError("falla simulada")
+
+    try:
+        proceso_con_error()
+    except ValueError as error:
+        print(f"Excepción propagada: {error}")
+    with open(ruta_prueba, encoding="utf-8") as archivo:
+        ultima = archivo.readlines()[-1].rstrip("\n")
+    print(f"Última línea del log: {ultima}")
+    assert "ERROR" in ultima and "salida: Paso 1: iniciando" in ultima
+
+    try:
+        auditar_salida("")
     except ValueError as error:
         print(f"Error esperado: {error}")
 
